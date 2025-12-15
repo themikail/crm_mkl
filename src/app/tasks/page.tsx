@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { AppShell } from '@/components/layout/app-shell';
 import { Button } from '@/components/ui/button';
-import { CheckSquare, Clock, Plus, RefreshCw, X } from 'lucide-react';
+import { CheckSquare, Clock, Plus, RefreshCw, X, Check } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import Link from 'next/link';
 import { tasks, Task } from '@/lib/data';
@@ -45,14 +45,14 @@ function TaskList({ tasks, onTaskCheckedChange }: { tasks: Task[], onTaskChecked
           <Checkbox
             id={`task-${task.id}`}
             checked={task.status === 'completed'}
-            onCheckedChange={(checked) =&gt; onTaskCheckedChange(task.id, !!checked)}
+            onCheckedChange={(checked) => onTaskCheckedChange(task.id, !!checked)}
           />
           <div className="flex-1">
             <label
               htmlFor={`task-${task.id}`}
               className={cn(
                 'font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
-                task.status === 'completed' &amp;&amp; 'line-through text-muted-foreground'
+                task.status === 'completed' && 'line-through text-muted-foreground'
               )}
             >
               {task.title}
@@ -68,12 +68,12 @@ function TaskList({ tasks, onTaskCheckedChange }: { tasks: Task[], onTaskChecked
                 >
                     {task.dueDate}
                 </p>
-                {task.linkedEntity &amp;&amp; (
-                    &lt;Badge variant="secondary"&gt;{task.linkedEntity}&lt;/Badge&gt;
+                {task.linkedEntity && (
+                    <Badge variant="secondary">{task.linkedEntity}</Badge>
                 )}
             </div>
           </div>
-          {task.status !== 'completed' &amp;&amp; &lt;Badge variant={task.status === 'overdue' ? 'destructive' : 'outline'}&gt;{task.status}&lt;/Badge&gt;}
+          {task.status !== 'completed' && <Badge variant={task.status === 'overdue' ? 'destructive' : 'outline'}>{task.status}</Badge>}
         </div>
       ))}
     </div>
@@ -86,9 +86,9 @@ export default function TasksPage() {
   const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = React.useState(false);
   const [taskList, setTaskList] = React.useState(tasks);
 
-  const handleTaskCheckedChange = (taskId: string, checked: boolean) =&gt; {
-    setTaskList(currentTasks =&gt;
-        currentTasks.map(task =&gt;
+  const handleTaskCheckedChange = (taskId: string, checked: boolean) => {
+    setTaskList(currentTasks =>
+        currentTasks.map(task =>
             task.id === taskId
             ? { ...task, status: checked ? 'completed' : task.dueDate === 'Yesterday' ? 'overdue' : 'pending' }
             : task
@@ -96,9 +96,9 @@ export default function TasksPage() {
     );
   };
   
-  const tasksByStatus = (status: Task['status']) =&gt; taskList.filter(t =&gt; t.status === status);
-  const tasksToday = taskList.filter(t =&gt; t.dueDate === 'Today' &amp;&amp; t.status !== 'completed');
-  const tasksThisWeek = taskList.filter(t =&gt; t.dueDate !== 'Last week' &amp;&amp; t.status !== 'completed');
+  const tasksByStatus = (status: Task['status']) => taskList.filter(t => t.status === status);
+  const tasksToday = taskList.filter(t => t.dueDate === 'Today' && t.status !== 'completed');
+  const tasksThisWeek = taskList.filter(t => t.dueDate !== 'Last week' && t.status !== 'completed');
 
 
   if (!isConnected) {
@@ -129,8 +129,8 @@ export default function TasksPage() {
                 <p className="text-muted-foreground text-sm">Last synced: Just now</p>
             </div>
             <div className="flex gap-2">
-                &lt;Button variant="outline"&gt;&lt;RefreshCw className="mr-2 h-4 w-4" /&gt; Sync Now&lt;/Button&gt;
-                <Button onClick={() =&gt; setIsNewTaskDialogOpen(true)}>&lt;Plus className="mr-2 h-4 w-4" /&gt; New Task&lt;/Button&gt;
+                <Button variant="outline"><RefreshCw className="mr-2 h-4 w-4" /> Sync Now</Button>
+                <Button onClick={() => setIsNewTaskDialogOpen(true)}><Plus className="mr-2 h-4 w-4" /> New Task</Button>
             </div>
         </div>
 
@@ -144,58 +144,58 @@ export default function TasksPage() {
           </TabsList>
           <TabsContent value="my-tasks">
             <Card>
-                <CardHeader&gt;&lt;CardTitle&gt;All My Tasks&lt;/CardTitle&gt;&lt;/CardHeader&gt;
-                &lt;CardContent&gt;
-                    &lt;TaskList tasks={taskList} onTaskCheckedChange={handleTaskCheckedChange} /&gt;
-                &lt;/CardContent&gt;
-            &lt;/Card&gt;
-          &lt;/TabsContent&gt;
-          &lt;TabsContent value="today"&gt;
-            &lt;Card&gt;
-                &lt;CardHeader&gt;&lt;CardTitle&gt;Tasks for Today&lt;/CardTitle&gt;&lt;/CardHeader&gt;
-                &lt;CardContent&gt;
-                    &lt;TaskList tasks={tasksToday} onTaskCheckedChange={handleTaskCheckedChange} /&gt;
-                &lt;/CardContent&gt;
-            &lt;/Card&gt;
-          &lt;/TabsContent&gt;
-          &lt;TabsContent value="overdue"&gt;
-            &lt;Card&gt;
-                &lt;CardHeader&gt;&lt;CardTitle&gt;Overdue Tasks&lt;/CardTitle&gt;&lt;/CardHeader&gt;
-                &lt;CardContent&gt;
-                    &lt;TaskList tasks={tasksByStatus('overdue')} onTaskCheckedChange={handleTaskCheckedChange} /&gt;
-                &lt;/CardContent&gt;
-            &lt;/Card&gt;
-          &lt;/TabsContent&gt;
-          &lt;TabsContent value="this-week"&gt;
-            &lt;Card&gt;
-                &lt;CardHeader&gt;&lt;CardTitle&gt;Tasks for This Week&lt;/CardTitle&gt;&lt;/CardHeader&gt;
-                &lt;CardContent&gt;
-                    &lt;TaskList tasks={tasksThisWeek} onTaskCheckedChange={handleTaskCheckedChange} /&gt;
-                &lt;/CardContent&gt;
-            &lt;/Card&gt;
-          &lt;/TabsContent&gt;
-          &lt;TabsContent value="completed"&gt;
-            &lt;Card&gt;
-                &lt;CardHeader&gt;&lt;CardTitle&gt;Completed Tasks&lt;/CardTitle&gt;&lt;/CardHeader&gt;
-                &lt;CardContent&gt;
-                    &lt;TaskList tasks={tasksByStatus('completed')} onTaskCheckedChange={handleTaskCheckedChange} /&gt;
-                &lt;/CardContent&gt;
-            &lt;/Card&gt;
-          &lt;/TabsContent&gt;
-        &lt;/Tabs&gt;
-      &lt;/div&gt;
+                <CardHeader><CardTitle>All My Tasks</CardTitle></CardHeader>
+                <CardContent>
+                    <TaskList tasks={taskList} onTaskCheckedChange={handleTaskCheckedChange} />
+                </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="today">
+            <Card>
+                <CardHeader><CardTitle>Tasks for Today</CardTitle></CardHeader>
+                <CardContent>
+                    <TaskList tasks={tasksToday} onTaskCheckedChange={handleTaskCheckedChange} />
+                </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="overdue">
+            <Card>
+                <CardHeader><CardTitle>Overdue Tasks</CardTitle></CardHeader>
+                <CardContent>
+                    <TaskList tasks={tasksByStatus('overdue')} onTaskCheckedChange={handleTaskCheckedChange} />
+                </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="this-week">
+            <Card>
+                <CardHeader><CardTitle>Tasks for This Week</CardTitle></CardHeader>
+                <CardContent>
+                    <TaskList tasks={tasksThisWeek} onTaskCheckedChange={handleTaskCheckedChange} />
+                </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="completed">
+            <Card>
+                <CardHeader><CardTitle>Completed Tasks</CardTitle></CardHeader>
+                <CardContent>
+                    <TaskList tasks={tasksByStatus('completed')} onTaskCheckedChange={handleTaskCheckedChange} />
+                </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
 
-      &lt;Dialog open={isNewTaskDialogOpen} onOpenChange={setIsNewTaskDialogOpen}&gt;
-        &lt;DialogContent className="sm:max-w-[425px]"&gt;
-          &lt;DialogHeader&gt;
-            &lt;DialogTitle&gt;Create New Task&lt;/DialogTitle&gt;
-            &lt;DialogDescription&gt;
+      <Dialog open={isNewTaskDialogOpen} onOpenChange={setIsNewTaskDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create New Task</DialogTitle>
+            <DialogDescription>
               Add a new task to your to-do list. You can also sync it with Google Tasks.
-            &lt;/DialogDescription&gt;
-          &lt;/DialogHeader&gt;
-          &lt;TaskForm onTaskCreated={() =&gt; setIsNewTaskDialogOpen(false)} /&gt;
-        &lt;/DialogContent&gt;
-      &lt;/Dialog&gt;
-    &lt;/AppShell&gt;
+            </DialogDescription>
+          </DialogHeader>
+          <TaskForm onTaskCreated={() => setIsNewTaskDialogOpen(false)} />
+        </DialogContent>
+      </Dialog>
+    </AppShell>
   );
 }
