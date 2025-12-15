@@ -1,3 +1,4 @@
+
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { google } from 'googleapis';
@@ -5,7 +6,6 @@ import { google } from 'googleapis';
 admin.initializeApp();
 
 const db = admin.firestore();
-const secrets = functions.config().google;
 const ORG_ID = 'groupmkl';
 const ADMIN_EMAIL = 'info@groupmkl.com';
 const ALLOWED_DOMAIN = '@groupmkl.com';
@@ -63,6 +63,10 @@ export const ensureOrgMembership = functions.https.onCall(async (data, context) 
  * Creates an OAuth2 client with the given credentials.
  */
 function getOAuth2Client() {
+    const secrets = functions.config().google;
+    if (!secrets || !secrets.client_id || !secrets.client_secret || !secrets.redirect_uri) {
+        throw new functions.https.HttpsError('internal', 'Google API secrets are not configured.');
+    }
     return new google.auth.OAuth2(
         secrets.client_id,
         secrets.client_secret,
@@ -155,6 +159,9 @@ export const syncGoogleCalendarEvents = functions.https.onCall(async (data, cont
         return { success: true, message: `${events.length} events synced.` };
     } catch (error) {
         console.error('Error syncing Google Calendar:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
         throw new functions.https.HttpsError('internal', 'Failed to sync Google Calendar events.');
     }
 });
@@ -212,6 +219,9 @@ export const syncGmailMessages = functions.https.onCall(async (data, context) =>
       return { success: true, message: `${messages.length} emails synced.` };
     } catch (error) {
       console.error('Error syncing Gmail:', error);
+       if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
       throw new functions.https.HttpsError('internal', 'Failed to sync Gmail messages.');
     }
 });
@@ -271,6 +281,9 @@ export const syncGoogleTasks = functions.https.onCall(async (data, context) => {
         return { success: true, message: `${totalTasksSynced} tasks synced.` };
     } catch (error) {
         console.error('Error syncing Google Tasks:', error);
+         if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
         throw new functions.https.HttpsError('internal', 'Failed to sync Google Tasks.');
     }
 });
