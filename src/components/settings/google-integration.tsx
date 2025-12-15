@@ -47,6 +47,20 @@ export function GoogleIntegration() {
       const credential = GoogleAuthProvider.credentialFromResult(result);
       if (credential && credential.accessToken) {
         const { user } = result;
+
+        // 1. Create or update the user's profile document
+        const userDocRef = doc(firestore, 'users', user.uid);
+        const userDocData = {
+          id: user.uid,
+          orgId: orgId,
+          email: user.email,
+          displayName: user.displayName,
+          role: 'Owner', // Assign a default role
+        };
+        // Use non-blocking write for the user profile
+        setDocumentNonBlocking(userDocRef, userDocData, { merge: true });
+        
+        // 2. Create the integration document
         const integrationDoc = {
           id: 'google',
           orgId: orgId,
