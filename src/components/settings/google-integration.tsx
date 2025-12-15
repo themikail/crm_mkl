@@ -33,8 +33,8 @@ export function GoogleIntegration() {
   const orgId = 'org-123'; // Hardcoded for now
 
   const integrationDocRef = useMemoFirebase(
-    () => (firestore && orgId ? doc(firestore, 'orgs', orgId, 'integrations', 'google') : null),
-    [firestore, orgId]
+    () => (firestore && orgId && user ? doc(firestore, 'orgs', orgId, 'integrations', 'google') : null),
+    [firestore, orgId, user]
   );
   
   const { data: integrationData, isLoading } = useDoc(integrationDocRef);

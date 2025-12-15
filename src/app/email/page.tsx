@@ -32,7 +32,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '@/hooks/use-toast';
 import { collection, doc, serverTimestamp, addDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { Email } from '@/lib/data';
 import { format } from 'date-fns';
 
@@ -49,11 +48,11 @@ export default function EmailPage() {
     const orgId = "org-123"; // Hardcoded for now
     const { toast } = useToast();
 
-    const integrationDocRef = useMemoFirebase(() => (firestore && orgId ? doc(firestore, `orgs/${orgId}/integrations/google`) : null), [firestore, orgId]);
+    const integrationDocRef = useMemoFirebase(() => (firestore && orgId && user ? doc(firestore, `orgs/${orgId}/integrations/google`) : null), [firestore, orgId, user]);
     const { data: integrationData } = useDoc(integrationDocRef);
     const isConnected = integrationData?.connected;
 
-    const emailsCollectionRef = useMemoFirebase(() => (firestore && orgId ? collection(firestore, `orgs/${orgId}/emails`) : null), [firestore, orgId]);
+    const emailsCollectionRef = useMemoFirebase(() => (firestore && orgId && user ? collection(firestore, `orgs/${orgId}/emails`) : null), [firestore, orgId, user]);
     const { data: emails, isLoading: isLoadingEmails } = useCollection<Email>(emailsCollectionRef);
 
     const [selectedEmail, setSelectedEmail] = React.useState<Email | null>(null);

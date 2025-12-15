@@ -98,11 +98,11 @@ export default function TasksPage() {
   const orgId = "org-123"; // Hardcoded for now
   const { toast } = useToast();
   
-  const integrationDocRef = useMemoFirebase(() => (firestore && orgId ? doc(firestore, `orgs/${orgId}/integrations/google`) : null), [firestore, orgId]);
+  const integrationDocRef = useMemoFirebase(() => (firestore && orgId && user ? doc(firestore, `orgs/${orgId}/integrations/google`) : null), [firestore, orgId, user]);
   const { data: integrationData } = useDoc(integrationDocRef);
   const isConnected = integrationData?.connected;
 
-  const tasksCollectionRef = useMemoFirebase(() => (firestore && orgId ? collection(firestore, `orgs/${orgId}/tasks`) : null), [firestore, orgId]);
+  const tasksCollectionRef = useMemoFirebase(() => (firestore && orgId && user ? collection(firestore, `orgs/${orgId}/tasks`) : null), [firestore, orgId, user]);
   const { data: taskList, isLoading: isLoadingTasks } = useCollection<Task>(tasksCollectionRef);
 
   const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = React.useState(false);
@@ -131,7 +131,7 @@ export default function TasksPage() {
   }, [isConnected, user]);
 
   const handleTaskCheckedChange = (taskId: string, checked: boolean) => {
-    if (!firestore) return;
+    if (!firestore || !user) return;
     const taskRef = doc(firestore, `orgs/${orgId}/tasks/${taskId}`);
     const status = checked ? 'completed' : 'needsAction';
     setDocumentNonBlocking(taskRef, { status, completedAt: checked ? serverTimestamp() : null }, { merge: true });

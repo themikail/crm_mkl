@@ -83,9 +83,11 @@ function EventForm({ event, onSave, onCancel, orgId }: { event?: CalendarEvent |
         };
 
         if (event?.id) {
+            if (!firestore) return;
             const eventRef = doc(firestore, 'orgs', orgId, 'calendarEvents', event.id);
             setDocumentNonBlocking(eventRef, { ...eventData, updatedAt: serverTimestamp() }, { merge: true });
         } else {
+            if (!firestore) return;
             const collectionRef = collection(firestore, 'orgs', orgId, 'calendarEvents');
             addDocumentNonBlocking(collectionRef, { ...eventData, createdAt: serverTimestamp() });
         }
@@ -183,11 +185,11 @@ export default function CalendarPage() {
   const [isSyncing, setIsSyncing] = React.useState(false);
   const orgId = "org-123"; // Hardcoded for now
 
-  const integrationDocRef = useMemoFirebase(() => (firestore && orgId ? doc(firestore, `orgs/${orgId}/integrations/google`) : null), [firestore, orgId]);
+  const integrationDocRef = useMemoFirebase(() => (firestore && orgId && user ? doc(firestore, `orgs/${orgId}/integrations/google`) : null), [firestore, orgId, user]);
   const { data: integrationData } = useDoc(integrationDocRef);
   const isConnected = integrationData?.connected;
 
-  const eventsCollectionRef = useMemoFirebase(() => (firestore && orgId ? collection(firestore, `orgs/${orgId}/calendarEvents`) : null), [firestore, orgId]);
+  const eventsCollectionRef = useMemoFirebase(() => (firestore && orgId && user ? collection(firestore, `orgs/${orgId}/calendarEvents`) : null), [firestore, orgId, user]);
   const { data: calendarEvents, isLoading: isLoadingEvents } = useCollection<CalendarEvent>(eventsCollectionRef);
 
   const [isEventSheetOpen, setIsEventSheetOpen] = React.useState(false);
