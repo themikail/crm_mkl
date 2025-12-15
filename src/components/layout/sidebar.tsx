@@ -23,6 +23,7 @@ import {
   Gem,
 } from 'lucide-react';
 import { UserNav } from '../user-nav';
+import dynamic from 'next/dynamic';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -32,6 +33,11 @@ const navItems = [
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
 ];
+
+const DynamicUserNav = dynamic(() => import('../user-nav').then(mod => mod.UserNav), {
+  ssr: false,
+});
+
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -83,7 +89,7 @@ export function AppSidebar() {
             </SidebarMenuItem>
         </SidebarMenu>
         <div className="p-2">
-            <UserNav />
+            <DynamicUserNav />
         </div>
       </SidebarFooter>
     </Sidebar>
