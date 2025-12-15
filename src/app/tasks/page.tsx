@@ -95,7 +95,7 @@ function TaskList({ tasks, onTaskCheckedChange }: { tasks: Task[], onTaskChecked
 export default function TasksPage() {
   const { firestore, user } = useFirebase();
   const [isSyncing, setIsSyncing] = React.useState(false);
-  const orgId = "org-123"; // Hardcoded for now
+  const orgId = "groupmkl";
   const { toast } = useToast();
   
   const integrationDocRef = useMemoFirebase(() => (firestore && orgId && user ? doc(firestore, `orgs/${orgId}/integrations/google`) : null), [firestore, orgId, user]);

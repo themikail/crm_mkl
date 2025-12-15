@@ -183,7 +183,7 @@ function EventForm({ event, onSave, onCancel, orgId }: { event?: CalendarEvent |
 export default function CalendarPage() {
   const { firestore, user } = useFirebase();
   const [isSyncing, setIsSyncing] = React.useState(false);
-  const orgId = "org-123"; // Hardcoded for now
+  const orgId = "groupmkl";
 
   const integrationDocRef = useMemoFirebase(() => (firestore && orgId && user ? doc(firestore, `orgs/${orgId}/integrations/google`) : null), [firestore, orgId, user]);
   const { data: integrationData } = useDoc(integrationDocRef);
