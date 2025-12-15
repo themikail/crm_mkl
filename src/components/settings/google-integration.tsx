@@ -8,14 +8,13 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useFirebase, useMemoFirebase } from '@/firebase';
-import {
-  GoogleAuthProvider,
-  signInWithPopup,
-} from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
-import { useDoc } from '@/firebase/firestore/use-doc';
+import { useFirebase, useMemoFirebase, useDoc } from '@/firebase';
+import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { Loader } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback } from 'react';
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('https://www.googleapis.com/auth/calendar');
@@ -24,130 +23,139 @@ googleProvider.addScope('https://www.googleapis.com/auth/gmail.send');
 googleProvider.addScope('https://www.googleapis.com/auth/gmail.modify');
 googleProvider.addScope('https://www.googleapis.com/auth/tasks');
 
+const ORG_ID = 'groupmkl';
+
 export function GoogleIntegration() {
   const { auth, firestore, user, isUserLoading } = useFirebase();
-  const orgId = 'org-123'; // Hardcoded for now
+  const router = useRouter();
+  const [status, setStatus] = useState<'loading' | 'requires_bootstrap' | 'ready' | 'error'>('loading');
+  const [error, setError] = useState<string | null>(null);
 
   // 1. Membership Check
   const memberDocRef = useMemoFirebase(
-    () => (firestore && user ? doc(firestore, `orgs/${orgId}/members`, user.uid) : null),
+    () => (firestore && user ? doc(firestore, `orgs/${ORG_ID}/members`, user.uid) : null),
     [firestore, user]
   );
   const { data: memberData, isLoading: isMemberLoading } = useDoc(memberDocRef);
-  const isMember = memberData != null;
-  const showBootstrap = !isMember && !isMemberLoading && !!user;
 
   // 2. Integration Data Fetch (only if membership is confirmed)
   const integrationDocRef = useMemoFirebase(
-    () => (firestore && user && isMember ? doc(firestore, 'orgs', orgId, 'integrations', 'google') : null),
-    [firestore, user, isMember]
+    () => (firestore && user && status === 'ready' ? doc(firestore, 'orgs', ORG_ID, 'integrations', 'google') : null),
+    [firestore, user, status]
   );
   const { data: integrationData, isLoading: isIntegrationLoading } = useDoc(integrationDocRef);
+  const isIntegrationConnected = integrationData?.connected;
+
+  const handleBootstrap = useCallback(async () => {
+    if (!user) return;
+    setStatus('loading');
+    setError(null);
+    try {
+      const functions = getFunctions();
+      const ensureOrgMembership = httpsCallable(functions, 'ensureOrgMembership');
+      const result = await ensureOrgMembership();
+      
+      const { success, message } = result.data as { success: boolean, message: string};
+      
+      if (success) {
+        setStatus('ready');
+      } else {
+        setError(message || 'Failed to setup account. Please contact support.');
+        setStatus('error');
+      }
+    } catch (e: any) {
+      console.error('Error bootstrapping account:', e);
+      setError(e.message || 'An unexpected error occurred during setup.');
+      setStatus('error');
+      // If setup fails due to domain, sign out
+      if (e.message?.includes('invalid-domain')) {
+        if(auth) await signOut(auth);
+        router.push('/login?error=invalid-domain');
+      }
+    }
+  }, [user, auth, router]);
+
+  useEffect(() => {
+    if (isUserLoading || isMemberLoading) {
+      setStatus('loading');
+      return;
+    }
+    if (user && !memberData) {
+      setStatus('requires_bootstrap');
+      handleBootstrap(); // Automatically trigger bootstrap
+    } else if (user && memberData) {
+      setStatus('ready');
+    }
+  }, [user, memberData, isUserLoading, isMemberLoading, handleBootstrap]);
 
 
   const handleConnect = async () => {
     if (!auth || !firestore || !user) return;
-
     try {
-      // Re-authenticate with Google to ensure we have the latest tokens and scopes.
       const result = await signInWithPopup(auth, googleProvider);
-      
-      const integrationDoc = {
-        id: 'google',
-        orgId: orgId,
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const token = credential?.accessToken; // This is the access token
+      const refreshToken = credential?.idToken; // You might need server-side flow for a long-lived refresh token
+
+      const integrationDocPayload = {
         connected: true,
-        scopes: googleProvider.providerId ? [googleProvider.providerId] : [],
         email: result.user.email,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        // WARNING: Storing access tokens client-side is not recommended for production.
+        // This should be handled server-side for security.
+        accessToken: token,
+        refreshToken: refreshToken, // This might be null on re-authentication
+        scopes: googleProvider.customParameters,
+        updatedAt: new Date().toISOString(),
       };
-      // This is a non-blocking write for a better UX. The UI will update optimistically.
-      await setDoc(doc(firestore, 'orgs', orgId, 'integrations', 'google'), integrationDoc, { merge: true });
+      await setDoc(doc(firestore, 'orgs', ORG_ID, 'integrations', 'google'), integrationDocPayload, { merge: true });
 
     } catch (error) {
       console.error('Error connecting Google account:', error);
     }
   };
 
-  const handleBootstrap = async () => {
-    if (!firestore || !user) return;
-    const batch = writeBatch(firestore);
-
-    // 1. User Profile
-    const userDocRef = doc(firestore, 'users', user.uid);
-    batch.set(userDocRef, {
-        id: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        orgId: orgId, // Associate user with the org
-    }, { merge: true });
-
-    // 2. Membership Document
-    const newMemberDocRef = doc(firestore, `orgs/${orgId}/members`, user.uid);
-    batch.set(newMemberDocRef, {
-        role: 'owner', // First user becomes owner
-        email: user.email,
-        createdAt: serverTimestamp(),
-    }, { merge: true });
-
-    await batch.commit();
-    // After this, the useDoc for memberData will refetch and unlock the rest of the UI.
-  }
-
   const handleDisconnect = async () => {
     if (!integrationDocRef) return;
     try {
-      await setDoc(integrationDocRef, { connected: false, updatedAt: serverTimestamp() }, { merge: true });
+      await setDoc(integrationDocRef, { connected: false, updatedAt: new Date().toISOString() }, { merge: true });
     } catch (error) {
       console.error('Error disconnecting Google account:', error);
     }
   };
-  
-  const isLoading = isUserLoading || isMemberLoading || (isMember && isIntegrationLoading);
+
+  const isLoading = status === 'loading' || isIntegrationLoading;
 
   if (isLoading) {
-      return (
-          <Card>
-            <CardHeader>
-              <CardTitle>Google Workspace</CardTitle>
-              <CardDescription>
-                Sync your Calendar, Email, and Tasks with Synergize CRM.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>Loading status...</p>
-            </CardContent>
-          </Card>
-        );
-  }
-
-  if (!user) {
     return (
-       <Card>
-          <CardHeader>
-            <CardTitle>Google Workspace</CardTitle>
-            <CardDescription>
-              Please sign in to connect your Google Workspace account.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-             <Button onClick={handleConnect}>Sign In with Google</Button>
-          </CardContent>
-        </Card>
-    )
+      <Card>
+        <CardHeader>
+          <CardTitle>Google Workspace</CardTitle>
+          <CardDescription>
+            Sync your Calendar, Email, and Tasks with Synergize CRM.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center gap-2">
+          <Loader className="animate-spin" />
+          <p>{status === 'requires_bootstrap' ? 'Setting up your account...' : 'Loading...'}</p>
+        </CardContent>
+      </Card>
+    );
   }
-
-  if(showBootstrap) {
-    return (
+  
+  if (status === 'error') {
+     return (
         <Card>
             <CardHeader>
-                <CardTitle>Finalize Account Setup</CardTitle>
+                <CardTitle className="text-destructive">Setup Failed</CardTitle>
                 <CardDescription>
-                You're signed in but not yet a member of an organization. Click below to complete your account setup.
+                There was a problem setting up your account.
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <Button onClick={handleBootstrap}>Setup Account & Join Organization</Button>
+                <p className="text-destructive-foreground bg-destructive p-3 rounded-md">{error}</p>
+                 <Button onClick={() => router.push('/login')} variant="outline" className="mt-4">
+                    Go to Login
+                </Button>
             </CardContent>
         </Card>
     )
@@ -162,7 +170,7 @@ export function GoogleIntegration() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {integrationData && integrationData.connected ? (
+        {isIntegrationConnected ? (
           <div className="flex flex-col gap-4">
             <p>
               Connected as <span className="font-semibold">{integrationData.email}</span>.

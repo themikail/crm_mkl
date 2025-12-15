@@ -7,17 +7,17 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
     
+    function isMklDomain() {
+      return isSignedIn() && request.auth.token.email.endsWith('@groupmkl.com');
+    }
+
     function getMembership(orgId) {
       return get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid));
     }
     
     function isOrgMember(orgId) {
-      return exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid));
+      return isMklDomain() && exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid));
     }
     
     function isOrgAdmin(orgId) {
@@ -30,55 +30,50 @@ service cloud.firestore {
       return isOrgMember(orgId) && role == 'owner';
     }
 
-    function hasValidOrgIdOnCreate(orgId) {
-      return request.resource.data.orgId == orgId;
-    }
-
-    function isOrgIdImmutable() {
-      return request.resource.data.orgId == resource.data.orgId;
-    }
+    // Rules
     
-    // User Profiles: Users can manage their own profile.
+    // Users collection is not used for authorization, so deny all reads/writes.
+    // User profile data should be stored within the org's members collection.
     match /users/{userId} {
-      allow read, update, delete: if isOwner(userId);
-      allow create: if isSignedIn();
+      allow read, write: if false;
     }
 
-    // Organizations: Org creation is handled by backend logic.
-    // Members can read the org doc, admins can update it.
+    // Lock down the entire `orgs` collection by default.
     match /orgs/{orgId} {
-      allow get: if isOrgMember(orgId);
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if isOrgAdmin(orgId);
-      allow delete: if false; // Deleting orgs should be a backend process
+        // Only allow access to the 'groupmkl' organization
+        allow read, write: if orgId == 'groupmkl' && isMklDomain();
 
-      // Members: 
-      // - Admins can manage all members.
-      // - Users can read their own membership.
-      // - New users can create their own membership doc.
-      match /members/{userId} {
-        allow get: if isOwner(userId) || isOrgAdmin(orgId);
-        allow list: if isOrgAdmin(orgId);
-        allow create: if isOwner(userId) && !exists(path); // Allow self-creation if not a member yet
-        allow update: if isOrgAdmin(orgId);
-        allow delete: if isOrgAdmin(orgId) && isOwner(userId) == false; // Prevent owner from being removed by other admins
-      }
-      
-      // Integrations: Members can read, admins can update.
-      match /integrations/google {
+        // Members can read the org doc, admins can update it.
         allow get: if isOrgMember(orgId);
-        allow create, update: if isOrgAdmin(orgId);
-        allow delete: if false;
-      }
-      
-      // Generic rule for all other subcollections (companies, contacts, etc.)
-      // Any member of the org can perform CRUD operations.
-      match /{collection}/{docId} {
-        allow read, list: if isOrgMember(orgId);
-        allow create: if isOrgMember(orgId) && hasValidOrgIdOnCreate(orgId);
-        allow update: if isOrgMember(orgId) && isOrgIdImmutable();
-        allow delete: if isOrgMember(orgId);
-      }
+        allow update: if isOrgAdmin(orgId);
+        // Org creation/deletion is handled by a secure backend function.
+        allow create, delete: if false; 
+
+        // Integrations: Members can read, admins can update.
+        match /integrations/google {
+          allow get: if isOrgMember(orgId);
+          allow create, update: if isOrgAdmin(orgId);
+          allow delete: if false;
+        }
+
+        // Members:
+        // Admins can manage all members.
+        // Users can read their own membership.
+        // Creation is handled by a secure backend function.
+        match /members/{userId} {
+          allow get: if request.auth.uid == userId || isOrgAdmin(orgId);
+          allow list: if isOrgAdmin(orgId);
+          allow update: if isOrgAdmin(orgId);
+          // Only admins can delete, and they cannot delete the owner.
+          allow delete: if isOrgAdmin(orgId) && resource.data.role != 'owner';
+          allow create: if false; // Creation handled by cloud function
+        }
+        
+        // Generic rule for all other subcollections (companies, contacts, deals, etc.)
+        // Any member of the org can perform CRUD operations.
+        match /{collection}/{docId} {
+          allow read, list, create, update, delete: if isOrgMember(orgId);
+        }
     }
   }
 }

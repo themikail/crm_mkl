@@ -6,6 +6,58 @@ admin.initializeApp();
 
 const db = admin.firestore();
 const secrets = functions.config().google;
+const ORG_ID = 'groupmkl';
+const ADMIN_EMAIL = 'info@groupmkl.com';
+const ALLOWED_DOMAIN = '@groupmkl.com';
+
+/**
+ * Callable function to ensure organization and membership exist for a user.
+ * This is the primary entry point for setting up a new user.
+ */
+export const ensureOrgMembership = functions.https.onCall(async (data, context) => {
+    if (!context.auth || !context.auth.token.email) {
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+
+    const userEmail = context.auth.token.email;
+    const uid = context.auth.uid;
+
+    // Enforce email domain restriction
+    if (!userEmail.endsWith(ALLOWED_DOMAIN)) {
+        throw new functions.https.HttpsError('permission-denied', 'Access denied. Invalid email domain.', { invalidDomain: true });
+    }
+
+    const orgRef = db.collection('orgs').doc(ORG_ID);
+    const memberRef = orgRef.collection('members').doc(uid);
+
+    return db.runTransaction(async (transaction) => {
+        const orgDoc = await transaction.get(orgRef);
+        const memberDoc = await transaction.get(memberRef);
+
+        // 1. Create the Organization if it doesn't exist
+        if (!orgDoc.exists) {
+            transaction.set(orgRef, {
+                name: 'Synergize CRM',
+                ownerEmail: ADMIN_EMAIL,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        }
+
+        // 2. Create the Membership if it doesn't exist
+        if (!memberDoc.exists) {
+            const role = userEmail === ADMIN_EMAIL ? 'owner' : 'member';
+            transaction.set(memberRef, {
+                email: userEmail,
+                role: role,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            return { success: true, message: `Membership created with role: ${role}.` };
+        }
+        
+        return { success: true, message: 'Membership already exists.' };
+    });
+});
+
 
 /**
  * Creates an OAuth2 client with the given credentials.
