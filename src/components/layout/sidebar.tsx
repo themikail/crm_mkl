@@ -54,10 +54,10 @@ export function AppSidebar() {
                   isActive={pathname === item.href}
                   tooltip={item.label}
                 >
-                  <>
+                  <span>
                     <item.icon />
                     <span>{item.label}</span>
-                  </>
+                  </span>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
@@ -74,10 +74,10 @@ export function AppSidebar() {
                         isActive={pathname === '/settings'}
                         tooltip="Settings"
                     >
-                        <>
+                        <span>
                             <Settings />
                             <span>Settings</span>
-                        </>
+                        </span>
                     </SidebarMenuButton>
                 </Link>
             </SidebarMenuItem>
