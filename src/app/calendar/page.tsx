@@ -42,7 +42,8 @@ import {
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { collection, doc, serverTimestamp, getFunctions, httpsCallable } from 'firebase/firestore';
+import { collection, doc, serverTimestamp } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useCollection, useDoc } from '@/firebase/firestore/use-collection';
 import { setDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { crmEntities } from '@/lib/data';
