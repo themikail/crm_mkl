@@ -3,10 +3,9 @@
 import * as React from 'react';
 import { AppShell } from '@/components/layout/app-shell';
 import { Button } from '@/components/ui/button';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useUser, useMemoFirebase } from '@/firebase';
 import Link from 'next/link';
-import { Mails, Send, Paperclip, Trash2 } from 'lucide-react';
-import { emails, Email, crmEntities } from '@/lib/data';
+import { Mails, Send, Paperclip, Trash2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -31,6 +30,11 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from '@/hooks/use-toast';
+import { collection, doc, getFunctions, httpsCallable, serverTimestamp } from 'firebase/firestore';
+import { useCollection, useDoc } from '@/firebase/firestore/use-collection';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import type { Email } from '@/lib/data';
+import { format } from 'date-fns';
 
 const emailFormSchema = z.object({
     to: z.string().email(),
@@ -40,21 +44,74 @@ const emailFormSchema = z.object({
 
 
 export default function EmailPage() {
-  const { user } = useFirebase(); // Assuming integration status is derived from user or a Firestore doc
-  const isConnected = true; // Mock: replace with actual logic
-  const [selectedEmail, setSelectedEmail] = React.useState<Email | null>(emails[0]);
-  const [isComposeOpen, setIsComposeOpen] = React.useState(false);
+    const { firestore, user } = useFirebase();
+    const [isSyncing, setIsSyncing] = React.useState(false);
+    const orgId = "org-123"; // Hardcoded for now
 
-  const form = useForm<z.infer<typeof emailFormSchema>>({
-    resolver: zodResolver(emailFormSchema),
-    defaultValues: { to: '', subject: '', body: '' },
-  });
+    const integrationDocRef = useMemoFirebase(() => (firestore && orgId ? doc(firestore, `orgs/${orgId}/integrations/google`) : null), [firestore, orgId]);
+    const { data: integrationData } = useDoc(integrationDocRef);
+    const isConnected = integrationData?.connected;
 
-  const handleSendEmail = (values: z.infer<typeof emailFormSchema>) => {
-    console.log('Sending email:', values);
-    toast({ title: 'Email Sent!', description: 'Your email has been sent successfully.' });
-    setIsComposeOpen(false);
-    form.reset();
+    const emailsCollectionRef = useMemoFirebase(() => (firestore && orgId ? collection(firestore, `orgs/${orgId}/emails`) : null), [firestore, orgId]);
+    const { data: emails, isLoading: isLoadingEmails } = useCollection(emailsCollectionRef);
+
+    const [selectedEmail, setSelectedEmail] = React.useState<Email | null>(null);
+    const [isComposeOpen, setIsComposeOpen] = React.useState(false);
+
+    const form = useForm<z.infer<typeof emailFormSchema>>({
+        resolver: zodResolver(emailFormSchema),
+        defaultValues: { to: '', subject: '', body: '' },
+    });
+
+    const handleSync = async () => {
+        if (!user) return;
+        setIsSyncing(true);
+        try {
+            const functions = getFunctions();
+            const syncGmailMessages = httpsCallable(functions, 'syncGmailMessages');
+            await syncGmailMessages({ orgId });
+            toast({ title: 'Success', description: 'Emails synced successfully.'});
+        } catch (error) {
+            console.error("Error syncing emails:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not sync emails.' });
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+    
+    React.useEffect(() => {
+        if (isConnected && user) {
+            handleSync();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isConnected, user]);
+
+    React.useEffect(() => {
+        if (emails && emails.length > 0 && !selectedEmail) {
+            setSelectedEmail(emails[0]);
+        }
+    }, [emails, selectedEmail]);
+
+    const handleSendEmail = (values: z.infer<typeof emailFormSchema>) => {
+        console.log('Sending email:', values);
+        toast({ title: 'Email Sent!', description: 'Your email has been sent successfully.' });
+        setIsComposeOpen(false);
+        form.reset();
+    };
+
+    const handleLogToCrm = (email: Email) => {
+      if (!firestore) return;
+      const activityRef = collection(firestore, 'orgs', orgId, 'activities');
+      setDocumentNonBlocking(doc(activityRef), {
+          orgId,
+          activityType: 'Email',
+          relatedEntityType: email.linkedEntityType || 'contact', // default to contact
+          relatedEntityId: email.linkedEntityId,
+          timestamp: new Date(email.date),
+          subject: `Email: ${email.subject}`,
+          notes: email.snippet,
+      }, { merge: true });
+      toast({ title: 'Logged to CRM', description: 'Email activity has been logged.' });
   };
 
   if (!isConnected) {
@@ -80,25 +137,36 @@ export default function EmailPage() {
     <AppShell>
         <div className="flex h-full flex-col">
             <div className="flex items-center justify-between p-4 border-b">
-                <h1 className="text-2xl font-semibold md:text-3xl">Email</h1>
-                <Button onClick={() => setIsComposeOpen(true)}>
-                    <Send className="mr-2 h-4 w-4" /> Compose
-                </Button>
+                <div>
+                    <h1 className="text-2xl font-semibold md:text-3xl">Email</h1>
+                    {integrationData?.lastSyncAt && <p className="text-sm text-muted-foreground">Last synced: {format(integrationData.lastSyncAt.toDate(), 'PPpp')}</p>}
+                </div>
+                <div className="flex gap-2">
+                    <Button onClick={handleSync} disabled={isSyncing}>
+                        <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                        {isSyncing ? 'Syncing...' : 'Sync Now'}
+                    </Button>
+                    <Button onClick={() => setIsComposeOpen(true)}>
+                        <Send className="mr-2 h-4 w-4" /> Compose
+                    </Button>
+                </div>
             </div>
             <div className="grid h-[calc(100vh-150px)] grid-cols-1 md:grid-cols-3">
                 <div className="md:col-span-1 overflow-y-auto border-r">
-                    <ul>
-                        {emails.map(email => (
-                             <li key={email.id} className={cn("p-4 border-b cursor-pointer hover:bg-muted", selectedEmail?.id === email.id && "bg-muted")} onClick={() => setSelectedEmail(email)}>
-                                <div className="flex justify-between items-center">
-                                    <p className={cn("font-semibold", !email.isRead && "font-bold")}>{email.from}</p>
-                                    <time className="text-xs text-muted-foreground">{email.date}</time>
-                                </div>
-                                <p className={cn("text-sm", !email.isRead && "font-bold")}>{email.subject}</p>
-                                <p className="text-sm text-muted-foreground truncate">{email.snippet}</p>
-                            </li>
-                        ))}
-                    </ul>
+                    {isLoadingEmails ? <p className="p-4">Loading emails...</p> : (
+                        <ul>
+                            {emails && emails.map(email => (
+                                <li key={email.id} className={cn("p-4 border-b cursor-pointer hover:bg-muted", selectedEmail?.id === email.id && "bg-muted")} onClick={() => setSelectedEmail(email)}>
+                                    <div className="flex justify-between items-center">
+                                        <p className="font-semibold truncate">{email.from}</p>
+                                        <time className="text-xs text-muted-foreground whitespace-nowrap ml-2">{format(new Date(email.date), 'PP p')}</time>
+                                    </div>
+                                    <p className="text-sm font-bold">{email.subject}</p>
+                                    <p className="text-sm text-muted-foreground truncate">{email.snippet}</p>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
                 <div className="md:col-span-2 overflow-y-auto">
                     {selectedEmail ? (
@@ -107,14 +175,12 @@ export default function EmailPage() {
                                  <div>
                                      <h2 className="text-xl font-semibold">{selectedEmail.subject}</h2>
                                      <p className="text-sm text-muted-foreground">From: {selectedEmail.from}</p>
+                                     <p className="text-sm text-muted-foreground">To: {selectedEmail.to}</p>
                                  </div>
-                                 <Button variant="outline">Log to CRM</Button>
+                                 <Button variant="outline" onClick={() => handleLogToCrm(selectedEmail)}>Log to CRM</Button>
                             </div>
                              <Separator />
-                             <div className="text-sm prose prose-sm max-w-none">
-                                <p>{selectedEmail.snippet}</p>
-                                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
-                                <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+                             <div className="text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: selectedEmail.snippet || '' }}>
                              </div>
                          </div>
                     ) : (

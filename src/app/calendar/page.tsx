@@ -3,11 +3,10 @@
 import * as React from 'react';
 import { AppShell } from '@/components/layout/app-shell';
 import { Button } from '@/components/ui/button';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useUser, useMemoFirebase } from '@/firebase';
 import Link from 'next/link';
-import { calendarEvents, CalendarEvent, crmEntities } from '@/lib/data';
 import { addDays, format, isWithinInterval } from 'date-fns';
-import { Calendar as CalendarIcon, Plus } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, RefreshCw } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -43,6 +42,11 @@ import {
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { collection, doc, serverTimestamp, getFunctions, httpsCallable } from 'firebase/firestore';
+import { useCollection, useDoc } from '@/firebase/firestore/use-collection';
+import { setDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { crmEntities } from '@/lib/data';
+import type { CalendarEvent } from '@/lib/data';
 
 const eventFormSchema = z.object({
     summary: z.string().min(1, "Summary is required"),
@@ -52,21 +56,37 @@ const eventFormSchema = z.object({
     linkedEntity: z.string().optional(),
 });
 
-function EventForm({ event, onSave, onCancel }: { event?: CalendarEvent | null, onSave: () => void, onCancel: () => void }) {
+function EventForm({ event, onSave, onCancel, orgId }: { event?: CalendarEvent | null, onSave: (data: any) => void, onCancel: () => void, orgId: string }) {
+    const { firestore } = useFirebase();
     const form = useForm<z.infer<typeof eventFormSchema>>({
         resolver: zodResolver(eventFormSchema),
         defaultValues: {
             summary: event?.summary || '',
-            start: event ? format(event.start, "yyyy-MM-dd'T'HH:mm") : '',
-            end: event ? format(event.end, "yyyy-MM-dd'T'HH:mm") : '',
-            attendees: event?.attendees.join(', ') || '',
+            start: event?.start ? format(new Date(event.start), "yyyy-MM-dd'T'HH:mm") : '',
+            end: event?.end ? format(new Date(event.end), "yyyy-MM-dd'T'HH:mm") : '',
+            attendees: event?.attendees?.join(', ') || '',
             linkedEntity: event?.linkedEntity || '',
         }
     });
 
     const handleSubmit = (values: z.infer<typeof eventFormSchema>) => {
-        console.log("Saving event:", values);
-        onSave();
+        const attendees = values.attendees.split(',').map(e => e.trim()).filter(e => e);
+        const eventData = {
+            ...values,
+            attendees,
+            start: new Date(values.start).toISOString(),
+            end: new Date(values.end).toISOString(),
+            orgId,
+        };
+
+        if (event?.id) {
+            const eventRef = doc(firestore, 'orgs', orgId, 'calendarEvents', event.id);
+            setDocumentNonBlocking(eventRef, { ...eventData, updatedAt: serverTimestamp() }, { merge: true });
+        } else {
+            const collectionRef = collection(firestore, 'orgs', orgId, 'calendarEvents');
+            addDocumentNonBlocking(collectionRef, { ...eventData, createdAt: serverTimestamp() });
+        }
+        onSave(eventData);
     };
 
     return (
@@ -155,19 +175,51 @@ function EventForm({ event, onSave, onCancel }: { event?: CalendarEvent | null, 
     );
 }
 
-
 export default function CalendarPage() {
-  const { user } = useFirebase(); // Assuming integration status is derived from user or a Firestore doc
-  const isConnected = true; // Mock: replace with actual logic
+  const { firestore, user } = useFirebase();
+  const [isSyncing, setIsSyncing] = React.useState(false);
+  const orgId = "org-123"; // Hardcoded for now
+
+  const integrationDocRef = useMemoFirebase(() => (firestore && orgId ? doc(firestore, `orgs/${orgId}/integrations/google`) : null), [firestore, orgId]);
+  const { data: integrationData } = useDoc(integrationDocRef);
+  const isConnected = integrationData?.connected;
+
+  const eventsCollectionRef = useMemoFirebase(() => (firestore && orgId ? collection(firestore, `orgs/${orgId}/calendarEvents`) : null), [firestore, orgId]);
+  const { data: calendarEvents, isLoading: isLoadingEvents } = useCollection(eventsCollectionRef);
+
   const [isEventSheetOpen, setIsEventSheetOpen] = React.useState(false);
   const [selectedEvent, setSelectedEvent] = React.useState<CalendarEvent | null>(null);
 
-  const upcomingEvents = calendarEvents.filter(event =>
-    isWithinInterval(event.start, {
-      start: new Date(),
-      end: addDays(new Date(), 14),
-    })
-  );
+  const handleSync = async () => {
+    if (!user) return;
+    setIsSyncing(true);
+    try {
+        const functions = getFunctions();
+        const syncGoogleCalendarEvents = httpsCallable(functions, 'syncGoogleCalendarEvents');
+        await syncGoogleCalendarEvents({ orgId });
+    } catch (error) {
+        console.error("Error syncing calendar events:", error);
+    } finally {
+        setIsSyncing(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (isConnected && user) {
+        handleSync();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, user]);
+
+  const upcomingEvents = React.useMemo(() => {
+    if (!calendarEvents) return [];
+    const now = new Date();
+    const twoWeeksFromNow = addDays(now, 14);
+    return calendarEvents.filter(event =>
+      isWithinInterval(new Date(event.start), { start: now, end: twoWeeksFromNow })
+    ).sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+  }, [calendarEvents]);
+
 
   const handleCreateEvent = () => {
     setSelectedEvent(null);
@@ -179,9 +231,10 @@ export default function CalendarPage() {
     setIsEventSheetOpen(true);
   };
 
-  const handleSaveEvent = () => {
-    console.log("Event saved");
+  const handleSaveEvent = async (data: any) => {
+    console.log("Event saved", data);
     setIsEventSheetOpen(false);
+    // Optionally trigger a sync for the specific event
   };
 
   if (!isConnected) {
@@ -207,11 +260,20 @@ export default function CalendarPage() {
     <AppShell>
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold md:text-3xl">Calendar</h1>
-          <Button onClick={handleCreateEvent}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Event
-          </Button>
+            <div>
+                <h1 className="text-2xl font-semibold md:text-3xl">Calendar</h1>
+                {integrationData?.lastSyncAt && <p className="text-sm text-muted-foreground">Last synced: {format(integrationData.lastSyncAt.toDate(), 'PPpp')}</p>}
+            </div>
+            <div className="flex gap-2">
+                <Button onClick={handleSync} disabled={isSyncing}>
+                    <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                    {isSyncing ? 'Syncing...' : 'Sync Now'}
+                </Button>
+                <Button onClick={handleCreateEvent}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Event
+                </Button>
+            </div>
         </div>
         
         <Card>
@@ -220,20 +282,22 @@ export default function CalendarPage() {
                 <CardDescription>Your meetings for the next 14 days.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="space-y-4">
-                    {upcomingEvents.map(event => (
-                        <div key={event.id} className="flex items-center justify-between rounded-md border p-4" onClick={() => handleViewEvent(event)}>
-                            <div>
-                                <p className="font-semibold">{event.summary}</p>
-                                <p className="text-sm text-muted-foreground">
-                                    {format(event.start, 'EEE, MMM d, yyyy, h:mm a')}
-                                </p>
-                                {event.linkedEntity && <p className='text-xs text-primary'>{event.linkedEntity}</p>}
+                {isLoadingEvents ? <p>Loading events...</p> : (
+                    <div className="space-y-4">
+                        {upcomingEvents.length > 0 ? upcomingEvents.map(event => (
+                            <div key={event.id} className="flex items-center justify-between rounded-md border p-4 cursor-pointer hover:bg-muted" onClick={() => handleViewEvent(event)}>
+                                <div>
+                                    <p className="font-semibold">{event.summary}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {format(new Date(event.start), 'EEE, MMM d, yyyy, h:mm a')}
+                                    </p>
+                                    {event.linkedEntity && <p className='text-xs text-primary'>{event.linkedEntity}</p>}
+                                </div>
+                                <Button variant="outline" size="sm">View</Button>
                             </div>
-                            <Button variant="outline" size="sm">View</Button>
-                        </div>
-                    ))}
-                </div>
+                        )) : <p>No upcoming events.</p>}
+                    </div>
+                )}
             </CardContent>
         </Card>
 
@@ -246,7 +310,7 @@ export default function CalendarPage() {
                     </SheetDescription>
                 </SheetHeader>
                 <div className="py-4">
-                   <EventForm event={selectedEvent} onSave={handleSaveEvent} onCancel={() => setIsEventSheetOpen(false)} />
+                   <EventForm event={selectedEvent} onSave={handleSaveEvent} onCancel={() => setIsEventSheetOpen(false)} orgId={orgId} />
                 </div>
             </SheetContent>
         </Sheet>

@@ -69,97 +69,53 @@ export const activityIcons: { [key: string]: Icon } = {
 
 export type Task = {
   id: string;
+  googleTaskId?: string;
   title: string;
-  dueDate: string;
-  status: 'completed' | 'pending' | 'overdue';
+  notes?: string;
+  due: string;
+  status: 'needsAction' | 'completed';
+  completedAt?: string;
   linkedEntity?: string;
+  linkedEntityType?: string;
+  linkedEntityId?: string;
+  syncState?: 'ok' | 'pending' | 'error';
+  updatedAt?: string;
 };
 
 export const tasks: Task[] = [
-  { id: '1', title: 'Follow up with TechCorp', dueDate: 'Today', status: 'pending', linkedEntity: 'TechCorp' },
-  { id: '2', title: 'Prepare proposal for Innovate LLC', dueDate: 'Tomorrow', status: 'pending', linkedEntity: 'Innovate LLC' },
-  { id: '3', title: 'Schedule demo with Globex Inc.', dueDate: 'In 3 days', status: 'pending', linkedEntity: 'Globex Inc.' },
-  { id: '4', title: 'Send invoice to Acme Corp', dueDate: 'Yesterday', status: 'overdue', linkedEntity: 'Acme Corp' },
-  { id: '5', title: 'Onboard new client - Stellar Solutions', dueDate: 'Last week', status: 'completed', linkedEntity: 'Stellar Solutions' },
+  { id: '1', title: 'Follow up with TechCorp', due: '2024-07-29T10:00:00Z', status: 'needsAction', linkedEntity: 'TechCorp' },
+  { id: '2', title: 'Prepare proposal for Innovate LLC', due: '2024-07-30T10:00:00Z', status: 'needsAction', linkedEntity: 'Innovate LLC' },
+  { id: '3', title: 'Schedule demo with Globex Inc.', due: '2024-08-01T10:00:00Z', status: 'needsAction', linkedEntity: 'Globex Inc.' },
+  { id: '4', title: 'Send invoice to Acme Corp', due: '2024-07-27T10:00:00Z', status: 'needsAction', linkedEntity: 'Acme Corp' },
+  { id: '5', title: 'Onboard new client - Stellar Solutions', due: '2024-07-22T10:00:00Z', status: 'completed', linkedEntity: 'Stellar Solutions' },
 ];
-
-export const taskIcons: { [key in Task['status']]: Icon } = {
-  completed: Check,
-  pending: Clock,
-  overdue: X,
-};
 
 export type CalendarEvent = {
     id: string;
+    googleEventId?: string;
     summary: string;
-    start: Date;
-    end: Date;
+    start: string;
+    end: string;
     attendees: string[];
+    htmlLink?: string;
+    linkedEntityType?: string;
+    linkedEntityId?: string;
     linkedEntity?: string;
+    updatedAt?: string;
 };
 
-export const calendarEvents: CalendarEvent[] = [
-    {
-        id: '1',
-        summary: 'Q3 Strategy Meeting',
-        start: new Date(new Date().setDate(new Date().getDate() + 1)),
-        end: new Date(new Date().setDate(new Date().getDate() + 1)),
-        attendees: ['john.doe@example.com', 'jane.smith@example.com'],
-        linkedEntity: 'Project Phoenix'
-    },
-    {
-        id: '2',
-        summary: 'Demo with Innovate LLC',
-        start: new Date(new Date().setDate(new Date().getDate() + 2)),
-        end: new Date(new Date().setDate(new Date().getDate() + 2)),
-        attendees: ['john.doe@example.com', 'contact@innovatellc.com'],
-        linkedEntity: 'Innovate LLC'
-    },
-    {
-        id: '3',
-        summary: 'Follow-up Call with TechCorp',
-        start: new Date(new Date().setDate(new Date().getDate() + 3)),
-        end: new Date(new Date().setDate(new Date().getDate() + 3)),
-        attendees: ['john.doe@example.com'],
-        linkedEntity: 'TechCorp'
-    }
-];
 
 export type Email = {
   id: string;
+  googleMessageId?: string;
+  threadId?: string;
   from: string;
+  to: string;
   subject: string;
   snippet: string;
   date: string;
-  isRead: boolean;
-  linkedEntity?: string;
+  linkedEntityType?: string;
+  linkedEntityId?: string;
 };
-
-export const emails: Email[] = [
-    {
-        id: '1',
-        from: 'Elena Rodriguez &lt;elena.r@techcorp.co&gt;',
-        subject: 'Re: Project Phoenix Proposal',
-        snippet: 'Hi John, thanks for sending that over. I have a few questions about the timeline...',
-        date: '2:45 PM',
-        isRead: false,
-    },
-    {
-        id: '2',
-        from: 'Ben Carter &lt;ben.c@innovatellc.com&gt;',
-        subject: 'Following up on our demo',
-        snippet: 'Great demo yesterday! We\'re very interested in moving forward. Let\'s discuss next steps.',
-        date: 'Yesterday',
-        isRead: true,
-    },
-    {
-        id: '3',
-        from: 'Marketing Team &lt;marketing@synergize.com&gt;',
-        subject: 'New Feature Announcement!',
-        snippet: 'We\'re excited to launch a new feature that will revolutionize your workflow...',
-        date: '3 days ago',
-        isRead: true,
-    }
-]
 
 export const crmEntities = ['Project Phoenix', 'Innovate LLC', 'TechCorp', 'Acme Corp', 'Stellar Solutions'];
