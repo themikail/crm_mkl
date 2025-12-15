@@ -14,6 +14,10 @@
           "type": "string",
           "description": "Name of the organization."
         },
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the user who owns the organization."
+        },
         "createdAt": {
           "type": "string",
           "description": "Timestamp when the organization was created.",
@@ -23,6 +27,7 @@
       "required": [
         "id",
         "name",
+        "ownerId",
         "createdAt"
       ]
     },
@@ -38,7 +43,7 @@
         },
         "orgId": {
           "type": "string",
-          "description": "Reference to Organization. (Relationship: Organization 1:N User)"
+          "description": "The primary organization this user belongs to."
         },
         "email": {
           "type": "string",
@@ -48,18 +53,45 @@
         "displayName": {
           "type": "string",
           "description": "User's display name."
-        },
-        "role": {
-          "type": "string",
-          "description": "User's role within the organization (e.g., Owner, Admin, Sales Manager, Sales Representative, Viewer)."
         }
       },
       "required": [
         "id",
-        "orgId",
         "email",
-        "displayName",
-        "role"
+        "displayName"
+      ]
+    },
+    "Member": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Member",
+      "type": "object",
+      "description": "Represents a user's membership within an organization, defining their role.",
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "User's role within the organization.",
+          "enum": [
+            "owner",
+            "admin",
+            "member",
+            "viewer"
+          ]
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email, for display and invitations.",
+          "format": "email"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of when the membership was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "role",
+        "email",
+        "createdAt"
       ]
     },
     "Company": {
@@ -656,6 +688,26 @@
         }
       },
       {
+        "path": "orgs/{orgId}/members/{userId}",
+        "definition": {
+          "entityName": "Member",
+          "schema": {
+            "$ref": "#/backend/entities/Member"
+          },
+          "description": "Subcollection for members within an organization. Each document's ID is the user's UID, and it defines their role.",
+          "params": [
+            {
+              "name": "orgId",
+              "description": "Unique identifier for the organization."
+            },
+            {
+              "name": "userId",
+              "description": "Unique identifier for the user (UID)."
+            }
+          ]
+        }
+      },
+      {
         "path": "orgs/{orgId}/companies/{companyId}",
         "definition": {
           "entityName": "Company",
@@ -851,7 +903,8 @@
           ]
         }
       }
-    ],
-    "reasoning": "This Firestore structure is designed to support a multi-tenant CRM with Google Workspace integrations, emphasizing security, scalability, and ease of debugging through adherence to the specified design principles. The structure leverages denormalization and structural segregation to ensure authorization independence and support secure list operations.\n\n**Authorization Independence:**  Authorization Independence is achieved by avoiding hierarchical authorization dependencies, eliminating the need for `get()` calls in security rules. This allows atomic operations to function correctly (transactions/batches) and simplifies debugging. The `orgId` is included in every collection to ensure that all data is scoped to the organization, and ownership is explicitly defined within documents. For collaborative access, the **Membership Map** (`members: {uid1: "
+    ]
   }
 }
+
+    

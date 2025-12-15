@@ -15,7 +15,7 @@ import {
   signOut as firebaseSignOut,
   OAuthCredential,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -48,19 +48,29 @@ export function GoogleIntegration() {
       if (credential && credential.accessToken) {
         const { user } = result;
 
+        // Use a batch to perform an atomic write
+        const batch = writeBatch(firestore);
+
         // 1. Create or update the user's profile document
         const userDocRef = doc(firestore, 'users', user.uid);
         const userDocData = {
           id: user.uid,
-          orgId: orgId,
           email: user.email,
           displayName: user.displayName,
-          role: 'Owner', // Assign a default role
         };
-        // Use a blocking write to ensure profile exists before proceeding
-        await setDoc(userDocRef, userDocData, { merge: true });
+        batch.set(userDocRef, userDocData, { merge: true });
+
+        // 2. Create the membership document
+        const memberDocRef = doc(firestore, `orgs/${orgId}/members`, user.uid);
+        const memberDocData = {
+            role: 'owner', // First user becomes owner
+            email: user.email,
+            createdAt: serverTimestamp(),
+        };
+        batch.set(memberDocRef, memberDocData, { merge: true });
         
-        // 2. Create the integration document
+        // 3. Create the integration document
+        const integrationDocRefUnmemoized = doc(firestore, 'orgs', orgId, 'integrations', 'google');
         const integrationDoc = {
           id: 'google',
           orgId: orgId,
@@ -70,11 +80,10 @@ export function GoogleIntegration() {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         };
-        
-        if (integrationDocRef) {
-          // This can remain non-blocking as it's not read immediately
-          setDocumentNonBlocking(integrationDocRef, integrationDoc, { merge: true });
-        }
+        batch.set(integrationDocRefUnmemoized, integrationDoc, { merge: true });
+
+        // Commit the atomic batch
+        await batch.commit();
       }
     } catch (error) {
       console.error('Error connecting Google account:', error);
@@ -132,3 +141,5 @@ export function GoogleIntegration() {
     </Card>
   );
 }
+
+    

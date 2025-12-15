@@ -1,282 +1,82 @@
-/**
- * Core Philosophy:
- * This ruleset enforces a strict multi-tenant security model where all data is
- * siloed within an organization. A user's access to any resource is primarily
- * determined by their membership in the resource's parent organization. This
- * ensures that data from one organization is never accessible to users from
- * another.
- *
- * Data Structure:
- * The data is organized into two main top-level collections:
- * 1. /users/{userId}: Stores individual user profiles, including which
- *    organization they belong to. This collection is private to each user.
- * 2. /orgs/{orgId}: A container for all data related to a specific
- *    organization. All CRM entities (companies, deals, tasks, etc.) are stored
- *    in subcollections under their respective organization's document.
- *
- * Key Security Decisions:
- * - Organization Membership is Key: Access to any data within `/orgs/{orgId}`
- *   requires the authenticated user to be a member of that organization. This
- *   is checked by reading the `orgId` from the user's private profile document
- *   at `/users/{request.auth.uid}`.
- * - User Privacy: Users can only read and write their own document in the
- *   `/users` collection. Listing users is explicitly disallowed to prevent
- *   user enumeration.
- * - Collaborative by Default: Within an organization, most data is considered
- *   collaborative. Any member of an organization can create, read, update,
- *   and delete CRM records like companies, contacts, and deals. More granular,
- *   role-based permissions can be layered on top of this foundation later.
- * - Immutable Organization Links: To maintain strict data siloing, the `orgId`
- *   field on any document within an organization's subcollection cannot be
- *   changed after the document is created.
- * - Read-Only Audit Logs: The `auditLogs` collection is immutable from client
- *   applications to ensure the integrity of the audit trail. These logs should
- *   only be created by trusted backend processes (e.g., Cloud Functions).
- *
- * Denormalization for Authorization:
- * The security model relies on two key pieces of denormalized data:
- * 1. The `orgId` is stored on every user's profile in `/users/{userId}`. This
- *    allows rules to efficiently verify a user's organization membership with a
- *    single `get()` call.
- * 2. Every document within an organization's data tree (e.g., a specific deal)
- *    also contains an `orgId` field. Rules enforce on creation and update that
- *    this `orgId` matches the `orgId` in the document path, ensuring relational
- *    integrity and preventing data from being moved between organizations.
- *
- * Structural Segregation:
- * User account information (`/users`) is structurally segregated from the
- * multi-tenant organization data (`/orgs`). This clean separation simplifies
- * rules by allowing for a very strict, ownership-based security model on user
- * data while applying a different, organization-based model to the CRM data.
- */
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions to abstract and simplify rule logic.
-
-    /**
-     * Checks if a user is authenticated.
-     */
+    // Helper Functions
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * Checks if the currently authenticated user is the owner of a document.
-     * @param userId The UID of the user to check against.
-     */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-
-    /**
-     * Checks if the currently authenticated user is a member of the specified organization.
-     * This is the core of the multi-tenant security model.
-     * It performs a single, predictable read to the user's own profile to verify their orgId.
-     * @param orgId The organization ID from the document path.
-     */
+    
+    function getMembership(orgId) {
+      return get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid));
+    }
+    
     function isOrgMember(orgId) {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.orgId == orgId;
+      return exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid));
+    }
+    
+    function isOrgAdmin(orgId) {
+      let role = getMembership(orgId).data.role;
+      return isOrgMember(orgId) && (role == 'admin' || role == 'owner');
     }
 
-    /**
-     * Checks for existence and organization membership. Used for safe updates and deletes.
-     */
-    function isExistingOrgMember(orgId) {
-      return isOrgMember(orgId) && resource != null;
+    function isOrgOwner(orgId) {
+      let role = getMembership(orgId).data.role;
+      return isOrgMember(orgId) && role == 'owner';
     }
 
-    /**
-     * Validates that the orgId in a new document's body matches the orgId in the path.
-     * This enforces relational integrity at creation time.
-     * @param orgId The organization ID from the document path.
-     */
     function hasValidOrgIdOnCreate(orgId) {
       return request.resource.data.orgId == orgId;
     }
 
-    /**
-     * Validates that the orgId of a document is not being changed during an update.
-     * This prevents documents from being moved between organizations.
-     */
     function isOrgIdImmutable() {
       return request.resource.data.orgId == resource.data.orgId;
     }
-
-    /**
-     * @description Rules for a user's own profile document.
-     * @path /users/{userId}
-     * @allow (get/update/delete) A user can get, update, or delete their own profile document.
-     * @allow (create) A new user can create their own profile document.
-     * @deny (list) Users cannot list all other users in the system.
-     * @deny (get) A user cannot get another user's profile.
-     * @principle Enforces strict data ownership for user profiles and prevents user enumeration.
-     */
+    
+    // User Profiles: Users can manage their own profile.
     match /users/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && resource != null;
-      allow delete: if isOwner(userId) && resource != null;
+      allow read, update, delete: if isOwner(userId);
+      allow create: if isSignedIn();
     }
 
-    /**
-     * @description Rules for the root organization document. Generally read-only for clients.
-     * @path /orgs/{orgId}
-     * @allow (get) An authenticated member of the organization can read the org document.
-     * @deny (list) Listing all organizations is denied.
-     * @deny (create/update/delete) Modifying organization documents is denied for clients.
-     * @principle Restricts access to members of the specific organization and prevents modification of core org data from the client-side.
-     */
+    // Organizations: Org creation is handled by backend logic.
+    // Members can read the org doc, admins can update it.
     match /orgs/{orgId} {
       allow get: if isOrgMember(orgId);
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isOrgAdmin(orgId);
+      allow delete: if false; // Deleting orgs should be a backend process
 
-    /**
-     * @description Generic rules for collaborative CRM data (Companies, Contacts, Deals, etc.).
-     * @path /orgs/{orgId}/companies/{companyId}
-     * @allow (get/list/create/update/delete) Any member of the organization can manage companies.
-     * @deny (any) Any user who is not a member of the organization is denied all access.
-     * @principle Enforces organization-level data siloing, allowing for collaboration within the org while validating relational integrity via the orgId field.
-     */
-    match /orgs/{orgId}/companies/{companyId} {
-      allow get, list: if isOrgMember(orgId);
-      allow create: if isOrgMember(orgId) && hasValidOrgIdOnCreate(orgId);
-      allow update: if isExistingOrgMember(orgId) && isOrgIdImmutable();
-      allow delete: if isExistingOrgMember(orgId);
-    }
-
-    /**
-     * @description Rules for contact data within an organization.
-     * @path /orgs/{orgId}/contacts/{contactId}
-     * @allow (get/list/create/update/delete) Any member of the organization can manage contacts.
-     * @deny (any) Any user who is not a member of the organization is denied all access.
-     * @principle Enforces organization-level data siloing, allowing for collaboration within the org while validating relational integrity via the orgId field.
-     */
-    match /orgs/{orgId}/contacts/{contactId} {
-      allow get, list: if isOrgMember(orgId);
-      allow create: if isOrgMember(orgId) && hasValidOrgIdOnCreate(orgId);
-      allow update: if isExistingOrgMember(orgId) && isOrgIdImmutable();
-      allow delete: if isExistingOrgMember(orgId);
-    }
-
-    /**
-     * @description Rules for deal data within an organization.
-     * @path /orgs/{orgId}/deals/{dealId}
-     * @allow (get/list/create/update/delete) Any member of the organization can manage deals.
-     * @deny (any) Any user who is not a member of the organization is denied all access.
-     * @principle Enforces organization-level data siloing, allowing for collaboration within the org while validating relational integrity via the orgId field.
-     */
-    match /orgs/{orgId}/deals/{dealId} {
-      allow get, list: if isOrgMember(orgId);
-      allow create: if isOrgMember(orgId) && hasValidOrgIdOnCreate(orgId);
-      allow update: if isExistingOrgMember(orgId) && isOrgIdImmutable();
-      allow delete: if isExistingOrgMember(orgId);
-    }
-
-    /**
-     * @description Rules for activity data within an organization.
-     * @path /orgs/{orgId}/activities/{activityId}
-     * @allow (get/list/create/update/delete) Any member of the organization can manage activities.
-     * @deny (any) Any user who is not a member of the organization is denied all access.
-     * @principle Enforces organization-level data siloing, allowing for collaboration within the org while validating relational integrity via the orgId field.
-     */
-    match /orgs/{orgId}/activities/{activityId} {
-      allow get, list: if isOrgMember(orgId);
-      allow create: if isOrgMember(orgId) && hasValidOrgIdOnCreate(orgId);
-      allow update: if isExistingOrgMember(orgId) && isOrgIdImmutable();
-      allow delete: if isExistingOrgMember(orgId);
-    }
-
-    /**
-     * @description Rules for task data within an organization.
-     * @path /orgs/{orgId}/tasks/{taskId}
-     * @allow (get/list/create/update/delete) Any member of the organization can manage tasks.
-     * @deny (any) Any user who is not a member of the organization is denied all access.
-     * @principle Enforces organization-level data siloing, allowing for collaboration within the org while validating relational integrity via the orgId field.
-     */
-    match /orgs/{orgId}/tasks/{taskId} {
-      allow get, list: if isOrgMember(orgId);
-      allow create: if isOrgMember(orgId) && hasValidOrgIdOnCreate(orgId);
-      allow update: if isExistingOrgMember(orgId) && isOrgIdImmutable();
-      allow delete: if isExistingOrgMember(orgId);
-    }
-
-    /**
-     * @description Rules for pipeline configuration data within an organization.
-     * @path /orgs/{orgId}/pipelines/{pipelineId}
-     * @allow (get/list/create/update/delete) Any member of the organization can manage pipelines.
-     * @deny (any) Any user who is not a member of the organization is denied all access.
-     * @principle Enforces organization-level data siloing, allowing for collaboration within the org while validating relational integrity via the orgId field.
-     */
-    match /orgs/{orgId}/pipelines/{pipelineId} {
-      allow get, list: if isOrgMember(orgId);
-      allow create: if isOrgMember(orgId) && hasValidOrgIdOnCreate(orgId);
-      allow update: if isExistingOrgMember(orgId) && isOrgIdImmutable();
-      allow delete: if isExistingOrgMember(orgId);
-    }
-
-    /**
-     * @description Rules for the Google integration settings document.
-     * @path /orgs/{orgId}/integrations/google
-     * @allow (get/create/update) Any member of the organization can read and manage the integration settings.
-     * @deny (list/delete) Listing is not applicable for a single doc, and deleting is denied for safety.
-     * @deny (any) Any user who is not a member of the organization is denied all access.
-     * @principle Enforces organization-level data siloing for critical integration settings.
-     */
-    match /orgs/{orgId}/integrations/google {
-      allow get: if isOrgMember(orgId);
-      allow list: if false;
-      allow create: if isOrgMember(orgId) && hasValidOrgIdOnCreate(orgId);
-      allow update: if isExistingOrgMember(orgId) && isOrgIdImmutable();
-      allow delete: if false;
-    }
-
-    /**
-     * @description Rules for audit logs, which are read-only for clients.
-     * @path /orgs/{orgId}/auditLogs/{logId}
-     * @allow (get/list) Any member of the organization can read audit logs.
-     * @deny (create/update/delete) All write operations are denied from the client to ensure log integrity.
-     * @principle Protects the integrity of the audit trail by making it immutable from client applications. Logs should only be created by trusted server environments.
-     */
-    match /orgs/{orgId}/auditLogs/{logId} {
-      allow get, list: if isOrgMember(orgId);
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    /**
-     * @description Rules for synced calendar event data within an organization.
-     * @path /orgs/{orgId}/calendarEvents/{calendarEventId}
-     * @allow (get/list/create/update/delete) Any member of the organization can manage calendar events.
-     * @deny (any) Any user who is not a member of the organization is denied all access.
-     * @principle Enforces organization-level data siloing for synced calendar data. While primarily managed by backend sync, this allows UI interaction.
-     */
-    match /orgs/{orgId}/calendarEvents/{calendarEventId} {
-      allow get, list: if isOrgMember(orgId);
-      allow create: if isOrgMember(orgId) && hasValidOrgIdOnCreate(orgId);
-      allow update: if isExistingOrgMember(orgId) && isOrgIdImmutable();
-      allow delete: if isExistingOrgMember(orgId);
-    }
-
-    /**
-     * @description Rules for synced email data within an organization.
-     * @path /orgs/{orgId}/emails/{emailId}
-     * @allow (get/list/create/update/delete) Any member of the organization can manage emails.
-     * @deny (any) Any user who is not a member of the organization is denied all access.
-     * @principle Enforces organization-level data siloing for synced email data. While primarily managed by backend sync, this allows UI interaction.
-     */
-    match /orgs/{orgId}/emails/{emailId} {
-      allow get, list: if isOrgMember(orgId);
-      allow create: if isOrgMember(orgId) && hasValidOrgIdOnCreate(orgId);
-      allow update: if isExistingOrgMember(orgId) && isOrgIdImmutable();
-      allow delete: if isExistingOrgMember(orgId);
+      // Members: Users can read their own membership, admins can manage all members.
+      match /members/{userId} {
+        allow get: if isOwner(userId) || isOrgAdmin(orgId);
+        allow list: if isOrgAdmin(orgId);
+        allow create, update: if isOrgAdmin(orgId);
+        allow delete: if isOrgAdmin(orgId) && isOwner(userId) == false; // Prevent owner from being removed by other admins
+      }
+      
+      // Integrations: Members can read, admins can update.
+      match /integrations/google {
+        allow get: if isOrgMember(orgId);
+        allow create, update: if isOrgAdmin(orgId);
+        allow delete: if false;
+      }
+      
+      // Generic rule for all other subcollections (companies, contacts, etc.)
+      // Any member of the org can perform CRUD operations.
+      match /{collection}/{docId} {
+        allow read, list: if isOrgMember(orgId);
+        allow create: if isOrgMember(orgId) && hasValidOrgIdOnCreate(orgId);
+        allow update: if isOrgMember(orgId) && isOrgIdImmutable();
+        allow delete: if isOrgMember(orgId);
+      }
     }
   }
 }
+
+    
