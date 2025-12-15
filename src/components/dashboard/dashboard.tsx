@@ -1,7 +1,15 @@
+'use client';
+
 import { OverviewCards } from './overview-cards';
-import { DealsChart } from './deals-chart';
+import dynamic from 'next/dynamic';
 import { RecentActivities } from './recent-activities';
 import { TasksOverview } from './tasks-overview';
+import { Skeleton } from '../ui/skeleton';
+
+const DealsChart = dynamic(() => import('./deals-chart').then(mod => mod.DealsChart), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[430px]" />
+});
 
 export function Dashboard() {
   return (
