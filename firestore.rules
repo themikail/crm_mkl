@@ -52,11 +52,15 @@ service cloud.firestore {
       allow update: if isOrgAdmin(orgId);
       allow delete: if false; // Deleting orgs should be a backend process
 
-      // Members: Users can read their own membership, admins can manage all members.
+      // Members: 
+      // - Admins can manage all members.
+      // - Users can read their own membership.
+      // - New users can create their own membership doc.
       match /members/{userId} {
         allow get: if isOwner(userId) || isOrgAdmin(orgId);
         allow list: if isOrgAdmin(orgId);
-        allow create, update: if isOrgAdmin(orgId);
+        allow create: if isOwner(userId) && !exists(path); // Allow self-creation if not a member yet
+        allow update: if isOrgAdmin(orgId);
         allow delete: if isOrgAdmin(orgId) && isOwner(userId) == false; // Prevent owner from being removed by other admins
       }
       
