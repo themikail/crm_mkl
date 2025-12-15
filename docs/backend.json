@@ -1,0 +1,856 @@
+{
+  "entities": {
+    "Organization": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Organization",
+      "type": "object",
+      "description": "Represents an organization in the CRM, isolating data for multi-tenancy.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the organization."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the organization."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the organization was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "createdAt"
+      ]
+    },
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user in the CRM.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user."
+        },
+        "orgId": {
+          "type": "string",
+          "description": "Reference to Organization. (Relationship: Organization 1:N User)"
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User's display name."
+        },
+        "role": {
+          "type": "string",
+          "description": "User's role within the organization (e.g., Owner, Admin, Sales Manager, Sales Representative, Viewer)."
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "email",
+        "displayName",
+        "role"
+      ]
+    },
+    "Company": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Company",
+      "type": "object",
+      "description": "Represents a company in the CRM.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the company."
+        },
+        "orgId": {
+          "type": "string",
+          "description": "Reference to Organization. (Relationship: Organization 1:N Company)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the company."
+        },
+        "website": {
+          "type": "string",
+          "description": "Company website URL.",
+          "format": "uri"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Company).  The user who owns this company."
+        },
+        "tags": {
+          "type": "array",
+          "description": "Array of tags associated with the company",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "name"
+      ]
+    },
+    "Contact": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Contact",
+      "type": "object",
+      "description": "Represents a contact in the CRM.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the contact."
+        },
+        "orgId": {
+          "type": "string",
+          "description": "Reference to Organization. (Relationship: Organization 1:N Contact)"
+        },
+        "companyId": {
+          "type": "string",
+          "description": "Reference to Company. (Relationship: Company 1:N Contact)"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name of the contact."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name of the contact."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the contact.",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number of the contact."
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Contact). The user who owns this contact."
+        },
+        "tags": {
+          "type": "array",
+          "description": "Array of tags associated with the contact",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "companyId",
+        "firstName",
+        "lastName",
+        "email"
+      ]
+    },
+    "Deal": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Deal",
+      "type": "object",
+      "description": "Represents a deal in the sales pipeline.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the deal."
+        },
+        "orgId": {
+          "type": "string",
+          "description": "Reference to Organization. (Relationship: Organization 1:N Deal)"
+        },
+        "companyId": {
+          "type": "string",
+          "description": "Reference to Company. (Relationship: Company 1:N Deal)"
+        },
+        "contactId": {
+          "type": "string",
+          "description": "Reference to Contact. (Relationship: Contact 1:N Deal)"
+        },
+        "dealValue": {
+          "type": "number",
+          "description": "Value of the deal."
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency of the deal value (e.g., USD, EUR)."
+        },
+        "stage": {
+          "type": "string",
+          "description": "Current stage of the deal in the pipeline."
+        },
+        "probability": {
+          "type": "number",
+          "description": "Probability of closing the deal (0-1)."
+        },
+        "expectedCloseDate": {
+          "type": "string",
+          "description": "Expected close date of the deal.",
+          "format": "date-time"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Deal).  The user who owns this deal."
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of the deal (e.g., Referral, Website, Cold Call)."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Notes about the deal."
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "companyId",
+        "contactId",
+        "dealValue",
+        "currency",
+        "stage",
+        "probability",
+        "expectedCloseDate",
+        "ownerId"
+      ]
+    },
+    "Activity": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Activity",
+      "type": "object",
+      "description": "Represents an activity related to a company, contact, or deal.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the activity."
+        },
+        "orgId": {
+          "type": "string",
+          "description": "Reference to Organization. (Relationship: Organization 1:N Activity)"
+        },
+        "activityType": {
+          "type": "string",
+          "description": "Type of activity (e.g., Call, Meeting, Email, Task, Note)."
+        },
+        "relatedEntityType": {
+          "type": "string",
+          "description": "Type of entity the activity is related to (e.g., company, contact, deal)."
+        },
+        "relatedEntityId": {
+          "type": "string",
+          "description": "ID of the entity the activity is related to."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of the activity.",
+          "format": "date-time"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject of the activity."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Notes about the activity."
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "activityType",
+        "relatedEntityType",
+        "relatedEntityId",
+        "timestamp"
+      ]
+    },
+    "Task": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Task",
+      "type": "object",
+      "description": "Represents a task in the CRM, potentially synced with Google Tasks.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the task."
+        },
+        "orgId": {
+          "type": "string",
+          "description": "Reference to Organization. (Relationship: Organization 1:N Task)"
+        },
+        "googleTaskId": {
+          "type": "string",
+          "description": "ID of the task in Google Tasks, if synced."
+        },
+        "taskListId": {
+          "type": "string",
+          "description": "ID of the task list in Google Tasks, if synced."
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the task."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Notes about the task."
+        },
+        "due": {
+          "type": "string",
+          "description": "Due date of the task.",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the task (e.g., open, completed)."
+        },
+        "completedAt": {
+          "type": "string",
+          "description": "Timestamp when the task was completed.",
+          "format": "date-time"
+        },
+        "linkedEntityType": {
+          "type": "string",
+          "description": "Type of entity the task is linked to (e.g., company, contact, deal)."
+        },
+        "linkedEntityId": {
+          "type": "string",
+          "description": "ID of the entity the task is linked to."
+        },
+        "syncState": {
+          "type": "string",
+          "description": "Sync state of the task with Google Tasks (e.g., ok, pending, error)."
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the task was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "title",
+        "status"
+      ]
+    },
+    "Pipeline": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Pipeline",
+      "type": "object",
+      "description": "Represents a sales pipeline configuration for an organization.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the pipeline."
+        },
+        "orgId": {
+          "type": "string",
+          "description": "Reference to Organization. (Relationship: Organization 1:N Pipeline)"
+        },
+        "stages": {
+          "type": "array",
+          "description": "Array of pipeline stages.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "stages"
+      ]
+    },
+    "GoogleIntegration": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GoogleIntegration",
+      "type": "object",
+      "description": "Represents the Google Workspace integration settings for an organization.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Google Integration."
+        },
+        "orgId": {
+          "type": "string",
+          "description": "Reference to Organization. (Relationship: Organization 1:N GoogleIntegration)"
+        },
+        "connected": {
+          "type": "boolean",
+          "description": "Indicates whether the Google Workspace integration is connected."
+        },
+        "scopes": {
+          "type": "array",
+          "description": "Array of Google API scopes granted for the integration.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the Google Workspace account connected.",
+          "format": "email"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the integration was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the integration was last updated.",
+          "format": "date-time"
+        },
+        "lastSyncAt": {
+          "type": "string",
+          "description": "Timestamp when the integration was last synced.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "connected",
+        "scopes",
+        "email"
+      ]
+    },
+    "AuditEvent": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AuditEvent",
+      "type": "object",
+      "description": "Represents an audit log entry for critical actions within the CRM.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the audit log entry."
+        },
+        "orgId": {
+          "type": "string",
+          "description": "Reference to Organization. (Relationship: Organization 1:N AuditEvent)"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N AuditEvent). The user who performed the action."
+        },
+        "action": {
+          "type": "string",
+          "description": "Description of the action that was performed (e.g., Deal created, Task completed)."
+        },
+        "entityType": {
+          "type": "string",
+          "description": "Type of entity the action was performed on (e.g., Deal, Task, Integration)."
+        },
+        "entityId": {
+          "type": "string",
+          "description": "ID of the entity the action was performed on."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of when the action was performed.",
+          "format": "date-time"
+        },
+        "details": {
+          "type": "string",
+          "description": "Additional details about the action (e.g., changes made to a deal)."
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "userId",
+        "action",
+        "entityType",
+        "entityId",
+        "timestamp"
+      ]
+    },
+    "CalendarEvent": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CalendarEvent",
+      "type": "object",
+      "description": "Represents a Google Calendar event synced with the CRM.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the calendar event in the CRM."
+        },
+        "orgId": {
+          "type": "string",
+          "description": "Reference to Organization. (Relationship: Organization 1:N CalendarEvent)"
+        },
+        "googleEventId": {
+          "type": "string",
+          "description": "ID of the event in Google Calendar."
+        },
+        "calendarId": {
+          "type": "string",
+          "description": "ID of the calendar in Google Calendar."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Summary or title of the event."
+        },
+        "start": {
+          "type": "string",
+          "description": "Start time of the event.",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "description": "End time of the event.",
+          "format": "date-time"
+        },
+        "attendees": {
+          "type": "array",
+          "description": "Array of attendees' email addresses.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "htmlLink": {
+          "type": "string",
+          "description": "Link to the event in Google Calendar.",
+          "format": "uri"
+        },
+        "linkedEntityType": {
+          "type": "string",
+          "description": "Type of entity the event is linked to (e.g., company, contact, deal)."
+        },
+        "linkedEntityId": {
+          "type": "string",
+          "description": "ID of the entity the event is linked to."
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the event was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "googleEventId",
+        "calendarId",
+        "summary",
+        "start",
+        "end"
+      ]
+    },
+    "Email": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Email",
+      "type": "object",
+      "description": "Represents a Gmail message synced with the CRM.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the email in the CRM."
+        },
+        "orgId": {
+          "type": "string",
+          "description": "Reference to Organization. (Relationship: Organization 1:N Email)"
+        },
+        "googleMessageId": {
+          "type": "string",
+          "description": "ID of the message in Gmail."
+        },
+        "threadId": {
+          "type": "string",
+          "description": "ID of the thread the message belongs to in Gmail."
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject of the email."
+        },
+        "from": {
+          "type": "string",
+          "description": "Sender of the email."
+        },
+        "to": {
+          "type": "string",
+          "description": "Recipient(s) of the email."
+        },
+        "date": {
+          "type": "string",
+          "description": "Date and time the email was sent.",
+          "format": "date-time"
+        },
+        "snippet": {
+          "type": "string",
+          "description": "Snippet of the email content."
+        },
+        "linkedEntityType": {
+          "type": "string",
+          "description": "Type of entity the email is linked to (e.g., company, contact, deal)."
+        },
+        "linkedEntityId": {
+          "type": "string",
+          "description": "ID of the entity the email is linked to."
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "googleMessageId",
+        "threadId",
+        "subject",
+        "from",
+        "to",
+        "date"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "orgs/{orgId}",
+        "definition": {
+          "entityName": "Organization",
+          "schema": {
+            "$ref": "#/backend/entities/Organization"
+          },
+          "description": "Root collection for organizations. Each organization's data is isolated within its own document.",
+          "params": [
+            {
+              "name": "orgId",
+              "description": "Unique identifier for the organization."
+            }
+          ]
+        }
+      },
+      {
+        "path": "users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Collection for user accounts.  User documents contain the `orgId` to associate them with an organization.  Security rules will enforce that only authenticated users can access their own document.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "Unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "orgs/{orgId}/companies/{companyId}",
+        "definition": {
+          "entityName": "Company",
+          "schema": {
+            "$ref": "#/backend/entities/Company"
+          },
+          "description": "Collection for companies within an organization. Each company document includes an `ownerId` field, which determines who has ownership of the company.",
+          "params": [
+            {
+              "name": "orgId",
+              "description": "Unique identifier for the organization."
+            },
+            {
+              "name": "companyId",
+              "description": "Unique identifier for the company."
+            }
+          ]
+        }
+      },
+      {
+        "path": "orgs/{orgId}/contacts/{contactId}",
+        "definition": {
+          "entityName": "Contact",
+          "schema": {
+            "$ref": "#/backend/entities/Contact"
+          },
+          "description": "Collection for contacts within an organization.  Each contact document includes an `ownerId` field indicating the owner of the contact.",
+          "params": [
+            {
+              "name": "orgId",
+              "description": "Unique identifier for the organization."
+            },
+            {
+              "name": "contactId",
+              "description": "Unique identifier for the contact."
+            }
+          ]
+        }
+      },
+      {
+        "path": "orgs/{orgId}/deals/{dealId}",
+        "definition": {
+          "entityName": "Deal",
+          "schema": {
+            "$ref": "#/backend/entities/Deal"
+          },
+          "description": "Collection for deals within an organization. Each deal includes an `ownerId` field for ownership and references to `companyId` and `contactId`.",
+          "params": [
+            {
+              "name": "orgId",
+              "description": "Unique identifier for the organization."
+            },
+            {
+              "name": "dealId",
+              "description": "Unique identifier for the deal."
+            }
+          ]
+        }
+      },
+      {
+        "path": "orgs/{orgId}/activities/{activityId}",
+        "definition": {
+          "entityName": "Activity",
+          "schema": {
+            "$ref": "#/backend/entities/Activity"
+          },
+          "description": "Collection for activities within an organization.  Activities are linked to companies, contacts, or deals via the `relatedEntityType` and `relatedEntityId` fields.",
+          "params": [
+            {
+              "name": "orgId",
+              "description": "Unique identifier for the organization."
+            },
+            {
+              "name": "activityId",
+              "description": "Unique identifier for the activity."
+            }
+          ]
+        }
+      },
+      {
+        "path": "orgs/{orgId}/tasks/{taskId}",
+        "definition": {
+          "entityName": "Task",
+          "schema": {
+            "$ref": "#/backend/entities/Task"
+          },
+          "description": "Collection for tasks within an organization. Tasks can be linked to Google Tasks and associated with companies, contacts, or deals using `linkedEntityType` and `linkedEntityId`.",
+          "params": [
+            {
+              "name": "orgId",
+              "description": "Unique identifier for the organization."
+            },
+            {
+              "name": "taskId",
+              "description": "Unique identifier for the task."
+            }
+          ]
+        }
+      },
+      {
+        "path": "orgs/{orgId}/pipelines/{pipelineId}",
+        "definition": {
+          "entityName": "Pipeline",
+          "schema": {
+            "$ref": "#/backend/entities/Pipeline"
+          },
+          "description": "Collection for pipeline configurations within an organization. Defines the stages available for deals.",
+          "params": [
+            {
+              "name": "orgId",
+              "description": "Unique identifier for the organization."
+            },
+            {
+              "name": "pipelineId",
+              "description": "Unique identifier for the pipeline."
+            }
+          ]
+        }
+      },
+      {
+        "path": "orgs/{orgId}/integrations/google",
+        "definition": {
+          "entityName": "GoogleIntegration",
+          "schema": {
+            "$ref": "#/backend/entities/GoogleIntegration"
+          },
+          "description": "Document representing the Google Workspace integration settings for an organization. Contains connection status, scopes, email, and sync timestamps.",
+          "params": [
+            {
+              "name": "orgId",
+              "description": "Unique identifier for the organization."
+            }
+          ]
+        }
+      },
+      {
+        "path": "orgs/{orgId}/auditLogs/{logId}",
+        "definition": {
+          "entityName": "AuditEvent",
+          "schema": {
+            "$ref": "#/backend/entities/AuditEvent"
+          },
+          "description": "Collection for audit log entries within an organization. Records critical actions performed by users.",
+          "params": [
+            {
+              "name": "orgId",
+              "description": "Unique identifier for the organization."
+            },
+            {
+              "name": "logId",
+              "description": "Unique identifier for the audit log entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "orgs/{orgId}/calendarEvents/{calendarEventId}",
+        "definition": {
+          "entityName": "CalendarEvent",
+          "schema": {
+            "$ref": "#/backend/entities/CalendarEvent"
+          },
+          "description": "Collection for Google Calendar events synced with the CRM. Includes denormalized fields for linking to CRM entities (company, contact, deal).",
+          "params": [
+            {
+              "name": "orgId",
+              "description": "Unique identifier for the organization."
+            },
+            {
+              "name": "calendarEventId",
+              "description": "Unique identifier for the calendar event in the CRM."
+            }
+          ]
+        }
+      },
+      {
+        "path": "orgs/{orgId}/emails/{emailId}",
+        "definition": {
+          "entityName": "Email",
+          "schema": {
+            "$ref": "#/backend/entities/Email"
+          },
+          "description": "Collection for Gmail messages synced with the CRM. Includes denormalized fields for linking to CRM entities (company, contact, deal).",
+          "params": [
+            {
+              "name": "orgId",
+              "description": "Unique identifier for the organization."
+            },
+            {
+              "name": "emailId",
+              "description": "Unique identifier for the email in the CRM."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "This Firestore structure is designed to support a multi-tenant CRM with Google Workspace integrations, emphasizing security, scalability, and ease of debugging through adherence to the specified design principles. The structure leverages denormalization and structural segregation to ensure authorization independence and support secure list operations.\n\n**Authorization Independence:**  Authorization Independence is achieved by avoiding hierarchical authorization dependencies, eliminating the need for `get()` calls in security rules. This allows atomic operations to function correctly (transactions/batches) and simplifies debugging. The `orgId` is included in every collection to ensure that all data is scoped to the organization, and ownership is explicitly defined within documents. For collaborative access, the **Membership Map** (`members: {uid1: "
+  }
+}
