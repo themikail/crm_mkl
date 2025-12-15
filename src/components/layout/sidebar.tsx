@@ -21,6 +21,8 @@ import {
   BarChart3,
   Settings,
   Gem,
+  Calendar,
+  Mails,
 } from 'lucide-react';
 import { UserNav } from '../user-nav';
 import dynamic from 'next/dynamic';
@@ -31,6 +33,8 @@ const navItems = [
   { href: '/companies', label: 'Companies', icon: Building2 },
   { href: '/contacts', label: 'Contacts', icon: Users },
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { href: '/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/email', label: 'Email', icon: Mails },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
 ];
 
@@ -56,9 +60,9 @@ export function AppSidebar() {
             <SidebarMenuItem key={item.label}>
               <Link href={item.href} passHref>
                 <SidebarMenuButton
-                  asChild
                   isActive={pathname === item.href}
                   tooltip={item.label}
+                  asChild
                 >
                   <span>
                     <item.icon />
@@ -77,7 +81,7 @@ export function AppSidebar() {
                 <Link href="/settings" passHref>
                     <SidebarMenuButton
                         asChild
-                        isActive={pathname === '/settings'}
+                        isActive={pathname.startsWith('/settings')}
                         tooltip="Settings"
                     >
                         <span>
