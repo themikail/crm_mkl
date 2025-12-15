@@ -20,6 +20,7 @@ export const ensureOrgMembership = functions.https.onCall(async (data, context) 
     }
 
     const userEmail = context.auth.token.email;
+    const userName = context.auth.token.name;
     const uid = context.auth.uid;
 
     // Enforce email domain restriction
@@ -29,6 +30,7 @@ export const ensureOrgMembership = functions.https.onCall(async (data, context) 
 
     const orgRef = db.collection('orgs').doc(ORG_ID);
     const memberRef = orgRef.collection('members').doc(uid);
+    const userRef = db.collection('users').doc(uid);
 
     return db.runTransaction(async (transaction) => {
         const orgDoc = await transaction.get(orgRef);
@@ -50,6 +52,12 @@ export const ensureOrgMembership = functions.https.onCall(async (data, context) 
                 email: userEmail,
                 role: role,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            // Also create the user profile doc
+            transaction.set(userRef, {
+                email: userEmail,
+                displayName: userName,
+                orgId: ORG_ID
             });
             return { success: true, message: `Membership created with role: ${role}.` };
         }
@@ -232,7 +240,7 @@ export const syncGmailMessages = functions.https.onCall(async (data, context) =>
 export const syncGoogleTasks = functions.https.onCall(async (data, context) => {
     const { orgId } = data;
     if (!context.auth || !orgId) {
-        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+        throw new functions.httpsa.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
 
     try {
@@ -281,9 +289,11 @@ export const syncGoogleTasks = functions.https.onCall(async (data, context) => {
         return { success: true, message: `${totalTasksSynced} tasks synced.` };
     } catch (error) {
         console.error('Error syncing Google Tasks:', error);
-         if (error instanceof functions.https.HttpsError) {
+         if (error instanceof functions.httpshttpsError) {
             throw error;
         }
         throw new functions.https.HttpsError('internal', 'Failed to sync Google Tasks.');
     }
 });
+
+    
