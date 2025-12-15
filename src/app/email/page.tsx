@@ -42,10 +42,10 @@ const emailFormSchema = z.object({
 export default function EmailPage() {
   const { user } = useFirebase(); // Assuming integration status is derived from user or a Firestore doc
   const isConnected = true; // Mock: replace with actual logic
-  const [selectedEmail, setSelectedEmail] = React.useState&lt;Email | null&gt;(emails[0]);
+  const [selectedEmail, setSelectedEmail] = React.useState<Email | null>(emails[0]);
   const [isComposeOpen, setIsComposeOpen] = React.useState(false);
 
-  const form = useForm&lt;z.infer&lt;typeof emailFormSchema&gt;&gt;({
+  const form = useForm<z.infer<typeof emailFormSchema>>({
     resolver: zodResolver(emailFormSchema),
     defaultValues: { to: '', subject: '', body: '' },
   });
@@ -81,20 +81,20 @@ export default function EmailPage() {
         <div className="flex h-full flex-col">
             <div className="flex items-center justify-between p-4 border-b">
                 <h1 className="text-2xl font-semibold md:text-3xl">Email</h1>
-                <Button onClick={() =&gt; setIsComposeOpen(true)}>
+                <Button onClick={() => setIsComposeOpen(true)}>
                     <Send className="mr-2 h-4 w-4" /> Compose
                 </Button>
             </div>
             <div className="grid h-[calc(100vh-150px)] grid-cols-1 md:grid-cols-3">
                 <div className="md:col-span-1 overflow-y-auto border-r">
                     <ul>
-                        {emails.map(email =&gt; (
-                             <li key={email.id} className={cn("p-4 border-b cursor-pointer hover:bg-muted", selectedEmail?.id === email.id &amp;&amp; "bg-muted")} onClick={() =&gt; setSelectedEmail(email)}>
+                        {emails.map(email => (
+                             <li key={email.id} className={cn("p-4 border-b cursor-pointer hover:bg-muted", selectedEmail?.id === email.id && "bg-muted")} onClick={() => setSelectedEmail(email)}>
                                 <div className="flex justify-between items-center">
-                                    <p className={cn("font-semibold", !email.isRead &amp;&amp; "font-bold")}>{email.from}</p>
+                                    <p className={cn("font-semibold", !email.isRead && "font-bold")}>{email.from}</p>
                                     <time className="text-xs text-muted-foreground">{email.date}</time>
                                 </div>
-                                <p className={cn("text-sm", !email.isRead &amp;&amp; "font-bold")}>{email.subject}</p>
+                                <p className={cn("text-sm", !email.isRead && "font-bold")}>{email.subject}</p>
                                 <p className="text-sm text-muted-foreground truncate">{email.snippet}</p>
                             </li>
                         ))}
@@ -135,10 +135,10 @@ export default function EmailPage() {
                         <FormField
                             control={form.control}
                             name="to"
-                            render={({ field }) =&gt; (
+                            render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>To</FormLabel>
-                                    <FormControl>&lt;Input placeholder="recipient@example.com" {...field} /&gt;&lt;/FormControl&gt;
+                                    <FormControl><Input placeholder="recipient@example.com" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -146,10 +146,10 @@ export default function EmailPage() {
                         <FormField
                             control={form.control}
                             name="subject"
-                            render={({ field }) =&gt; (
+                            render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Subject</FormLabel>
-                                    &lt;FormControl&gt;&lt;Input placeholder="Email subject" {...field} /&gt;&lt;/FormControl&gt;
+                                    <FormControl><Input placeholder="Email subject" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -157,21 +157,21 @@ export default function EmailPage() {
                         <FormField
                             control={form.control}
                             name="body"
-                            render={({ field }) =&gt; (
+                            render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Body</FormLabel>
-                                    &lt;FormControl&gt;&lt;Textarea placeholder="Write your message..." className="min-h-[200px]" {...field} /&gt;&lt;/FormControl&gt;
+                                    <FormControl><Textarea placeholder="Write your message..." className="min-h-[200px]" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
                          <DialogFooter className="flex justify-between w-full">
                             <div>
-                                <Button type="button" variant="ghost" size="icon">&lt;Paperclip /&gt;&lt;/Button&gt;
+                                <Button type="button" variant="ghost" size="icon"><Paperclip /></Button>
                             </div>
                             <div className="flex gap-2">
-                                <Button type="button" variant="ghost" onClick={() =&gt; setIsComposeOpen(false)}>&lt;Trash2 className="mr-2 h-4 w-4" /&gt; Discard&lt;/Button&gt;
-                                <Button type="submit">&lt;Send className="mr-2 h-4 w-4" /&gt; Send&lt;/Button&gt;
+                                <Button type="button" variant="ghost" onClick={() => setIsComposeOpen(false)}><Trash2 className="mr-2 h-4 w-4" /> Discard</Button>
+                                <Button type="submit"><Send className="mr-2 h-4 w-4" /> Send</Button>
                             </div>
                         </DialogFooter>
                     </form>
