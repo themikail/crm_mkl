@@ -160,26 +160,26 @@ export default function CalendarPage() {
   const { user } = useFirebase(); // Assuming integration status is derived from user or a Firestore doc
   const isConnected = true; // Mock: replace with actual logic
   const [isEventSheetOpen, setIsEventSheetOpen] = React.useState(false);
-  const [selectedEvent, setSelectedEvent] = React.useState&lt;CalendarEvent | null&gt;(null);
+  const [selectedEvent, setSelectedEvent] = React.useState<CalendarEvent | null>(null);
 
-  const upcomingEvents = calendarEvents.filter(event =&gt;
+  const upcomingEvents = calendarEvents.filter(event =>
     isWithinInterval(event.start, {
       start: new Date(),
       end: addDays(new Date(), 14),
     })
   );
 
-  const handleCreateEvent = () =&gt; {
+  const handleCreateEvent = () => {
     setSelectedEvent(null);
     setIsEventSheetOpen(true);
   };
 
-  const handleViewEvent = (event: CalendarEvent) =&gt; {
+  const handleViewEvent = (event: CalendarEvent) => {
     setSelectedEvent(event);
     setIsEventSheetOpen(true);
   };
 
-  const handleSaveEvent = () =&gt; {
+  const handleSaveEvent = () => {
     console.log("Event saved");
     setIsEventSheetOpen(false);
   };
@@ -221,14 +221,14 @@ export default function CalendarPage() {
             </CardHeader>
             <CardContent>
                 <div className="space-y-4">
-                    {upcomingEvents.map(event =&gt; (
-                        <div key={event.id} className="flex items-center justify-between rounded-md border p-4" onClick={() =&gt; handleViewEvent(event)}>
+                    {upcomingEvents.map(event => (
+                        <div key={event.id} className="flex items-center justify-between rounded-md border p-4" onClick={() => handleViewEvent(event)}>
                             <div>
                                 <p className="font-semibold">{event.summary}</p>
                                 <p className="text-sm text-muted-foreground">
                                     {format(event.start, 'EEE, MMM d, yyyy, h:mm a')}
                                 </p>
-                                {event.linkedEntity &amp;&amp; &lt;p className='text-xs text-primary'&gt;{event.linkedEntity}&lt;/p&gt;}
+                                {event.linkedEntity && <p className='text-xs text-primary'>{event.linkedEntity}</p>}
                             </div>
                             <Button variant="outline" size="sm">View</Button>
                         </div>
@@ -246,7 +246,7 @@ export default function CalendarPage() {
                     </SheetDescription>
                 </SheetHeader>
                 <div className="py-4">
-                   <EventForm event={selectedEvent} onSave={handleSaveEvent} onCancel={() =&gt; setIsEventSheetOpen(false)} />
+                   <EventForm event={selectedEvent} onSave={handleSaveEvent} onCancel={() => setIsEventSheetOpen(false)} />
                 </div>
             </SheetContent>
         </Sheet>
