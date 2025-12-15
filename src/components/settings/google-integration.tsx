@@ -57,8 +57,8 @@ export function GoogleIntegration() {
           displayName: user.displayName,
           role: 'Owner', // Assign a default role
         };
-        // Use non-blocking write for the user profile
-        setDocumentNonBlocking(userDocRef, userDocData, { merge: true });
+        // Use a blocking write to ensure profile exists before proceeding
+        await setDoc(userDocRef, userDocData, { merge: true });
         
         // 2. Create the integration document
         const integrationDoc = {
@@ -72,6 +72,7 @@ export function GoogleIntegration() {
         };
         
         if (integrationDocRef) {
+          // This can remain non-blocking as it's not read immediately
           setDocumentNonBlocking(integrationDocRef, integrationDoc, { merge: true });
         }
       }
