@@ -71,8 +71,8 @@ service cloud.firestore {
         
         // Generic rule for all other subcollections (companies, contacts, deals, etc.)
         // Any member of the org can perform CRUD operations.
-        match /{collection}/{docId} {
-          allow read, list, create, update, delete: if isOrgMember(orgId);
+        match /{collection}/{docId=**} {
+          allow read, write: if isOrgMember(orgId);
         }
     }
   }
