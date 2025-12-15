@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { AppShell } from '@/components/layout/app-shell';
 import { Button } from '@/components/ui/button';
-import { useFirebase, useUser, useMemoFirebase } from '@/firebase';
+import { useFirebase, useUser, useMemoFirebase, useCollection, useDoc } from '@/firebase';
 import Link from 'next/link';
 import { addDays, format, isWithinInterval } from 'date-fns';
 import { Calendar as CalendarIcon, Plus, RefreshCw } from 'lucide-react';
@@ -44,7 +44,6 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { collection, doc, serverTimestamp } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { useCollection, useDoc } from '@/firebase/firestore/use-collection';
 import { setDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { crmEntities } from '@/lib/data';
 import type { CalendarEvent } from '@/lib/data';
@@ -66,18 +65,21 @@ function EventForm({ event, onSave, onCancel, orgId }: { event?: CalendarEvent |
             start: event?.start ? format(new Date(event.start), "yyyy-MM-dd'T'HH:mm") : '',
             end: event?.end ? format(new Date(event.end), "yyyy-MM-dd'T'HH:mm") : '',
             attendees: event?.attendees?.join(', ') || '',
-            linkedEntity: event?.linkedEntity || '',
+            linkedEntity: (event?.linkedEntityId && event.linkedEntityType) ? `${event.linkedEntityType}/${event.linkedEntityId}` : '',
         }
     });
 
     const handleSubmit = (values: z.infer<typeof eventFormSchema>) => {
         const attendees = values.attendees.split(',').map(e => e.trim()).filter(e => e);
+        const [linkedEntityType, linkedEntityId] = values.linkedEntity?.split('/') || [null, null];
         const eventData = {
-            ...values,
-            attendees,
+            summary: values.summary,
             start: new Date(values.start).toISOString(),
             end: new Date(values.end).toISOString(),
+            attendees,
             orgId,
+            linkedEntityType,
+            linkedEntityId,
         };
 
         if (event?.id) {
@@ -186,7 +188,7 @@ export default function CalendarPage() {
   const isConnected = integrationData?.connected;
 
   const eventsCollectionRef = useMemoFirebase(() => (firestore && orgId ? collection(firestore, `orgs/${orgId}/calendarEvents`) : null), [firestore, orgId]);
-  const { data: calendarEvents, isLoading: isLoadingEvents } = useCollection(eventsCollectionRef);
+  const { data: calendarEvents, isLoading: isLoadingEvents } = useCollection<CalendarEvent>(eventsCollectionRef);
 
   const [isEventSheetOpen, setIsEventSheetOpen] = React.useState(false);
   const [selectedEvent, setSelectedEvent] = React.useState<CalendarEvent | null>(null);
@@ -216,9 +218,13 @@ export default function CalendarPage() {
     if (!calendarEvents) return [];
     const now = new Date();
     const twoWeeksFromNow = addDays(now, 14);
-    return calendarEvents.filter(event =>
-      isWithinInterval(new Date(event.start), { start: now, end: twoWeeksFromNow })
-    ).sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+    return calendarEvents.filter(event => {
+      if (!event.start) return false;
+      return isWithinInterval(new Date(event.start), { start: now, end: twoWeeksFromNow })
+    }).sort((a, b) => {
+      if (!a.start || !b.start) return 0;
+      return new Date(a.start).getTime() - new Date(b.start).getTime()
+    });
   }, [calendarEvents]);
 
 
@@ -290,9 +296,9 @@ export default function CalendarPage() {
                                 <div>
                                     <p className="font-semibold">{event.summary}</p>
                                     <p className="text-sm text-muted-foreground">
-                                        {format(new Date(event.start), 'EEE, MMM d, yyyy, h:mm a')}
+                                        {event.start && format(new Date(event.start), 'EEE, MMM d, yyyy, h:mm a')}
                                     </p>
-                                    {event.linkedEntity && <p className='text-xs text-primary'>{event.linkedEntity}</p>}
+                                    {event.linkedEntityId && <p className='text-xs text-primary'>{event.linkedEntityType}/{event.linkedEntityId}</p>}
                                 </div>
                                 <Button variant="outline" size="sm">View</Button>
                             </div>

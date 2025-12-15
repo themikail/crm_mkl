@@ -4,7 +4,7 @@ import * as React from 'react';
 import { AppShell } from '@/components/layout/app-shell';
 import { Button } from '@/components/ui/button';
 import { CheckSquare, Clock, Plus, RefreshCw, X, Check } from 'lucide-react';
-import { useFirebase, useUser, useMemoFirebase } from '@/firebase';
+import { useFirebase, useUser, useMemoFirebase, useCollection, useDoc } from '@/firebase';
 import Link from 'next/link';
 import {
   Card,
@@ -21,10 +21,10 @@ import { TaskForm } from '@/components/task-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { collection, doc, serverTimestamp } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { useCollection, useDoc } from '@/firebase/firestore/use-collection';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { Task } from '@/lib/data';
 import { format, isAfter, isBefore, isToday, startOfWeek, endOfWeek } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 
 const taskIcons = {
@@ -96,6 +96,7 @@ export default function TasksPage() {
   const { firestore, user } = useFirebase();
   const [isSyncing, setIsSyncing] = React.useState(false);
   const orgId = "org-123"; // Hardcoded for now
+  const { toast } = useToast();
   
   const integrationDocRef = useMemoFirebase(() => (firestore && orgId ? doc(firestore, `orgs/${orgId}/integrations/google`) : null), [firestore, orgId]);
   const { data: integrationData } = useDoc(integrationDocRef);
@@ -138,7 +139,7 @@ export default function TasksPage() {
   
   const sortedTasks = React.useMemo(() => taskList ? [...taskList].sort((a,b) => (a.due && b.due) ? new Date(a.due).getTime() - new Date(b.due).getTime() : 0) : [], [taskList]);
 
-  const tasksByStatus = (status: Task['status']) => sortedTasks.filter(t => getTaskStatus(t) === status);
+  const tasksByStatus = (status: 'completed' | 'pending' | 'overdue') => sortedTasks.filter(t => getTaskStatus(t) === status);
   const tasksToday = sortedTasks.filter(t => t.due && isToday(new Date(t.due)) && getTaskStatus(t) !== 'completed');
   const tasksThisWeek = sortedTasks.filter(t => {
       if(!t.due) return false;

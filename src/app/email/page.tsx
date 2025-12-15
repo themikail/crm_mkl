@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { AppShell } from '@/components/layout/app-shell';
 import { Button } from '@/components/ui/button';
-import { useFirebase, useUser, useMemoFirebase } from '@/firebase';
+import { useFirebase, useUser, useMemoFirebase, useDoc, useCollection } from '@/firebase';
 import Link from 'next/link';
 import { Mails, Send, Paperclip, Trash2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -29,10 +29,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from '@/hooks/use-toast';
-import { collection, doc, serverTimestamp } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { collection, doc, serverTimestamp, addDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { useCollection, useDoc } from '@/firebase/firestore/use-collection';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { Email } from '@/lib/data';
 import { format } from 'date-fns';
@@ -48,13 +47,14 @@ export default function EmailPage() {
     const { firestore, user } = useFirebase();
     const [isSyncing, setIsSyncing] = React.useState(false);
     const orgId = "org-123"; // Hardcoded for now
+    const { toast } = useToast();
 
     const integrationDocRef = useMemoFirebase(() => (firestore && orgId ? doc(firestore, `orgs/${orgId}/integrations/google`) : null), [firestore, orgId]);
     const { data: integrationData } = useDoc(integrationDocRef);
     const isConnected = integrationData?.connected;
 
     const emailsCollectionRef = useMemoFirebase(() => (firestore && orgId ? collection(firestore, `orgs/${orgId}/emails`) : null), [firestore, orgId]);
-    const { data: emails, isLoading: isLoadingEmails } = useCollection(emailsCollectionRef);
+    const { data: emails, isLoading: isLoadingEmails } = useCollection<Email>(emailsCollectionRef);
 
     const [selectedEmail, setSelectedEmail] = React.useState<Email | null>(null);
     const [isComposeOpen, setIsComposeOpen] = React.useState(false);
@@ -89,7 +89,8 @@ export default function EmailPage() {
 
     React.useEffect(() => {
         if (emails && emails.length > 0 && !selectedEmail) {
-            setSelectedEmail(emails[0]);
+            const sortedEmails = [...emails].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            setSelectedEmail(sortedEmails[0]);
         }
     }, [emails, selectedEmail]);
 
@@ -103,7 +104,7 @@ export default function EmailPage() {
     const handleLogToCrm = (email: Email) => {
       if (!firestore) return;
       const activityRef = collection(firestore, 'orgs', orgId, 'activities');
-      setDocumentNonBlocking(doc(activityRef), {
+      addDoc(activityRef, {
           orgId,
           activityType: 'Email',
           relatedEntityType: email.linkedEntityType || 'contact', // default to contact
@@ -111,7 +112,7 @@ export default function EmailPage() {
           timestamp: new Date(email.date),
           subject: `Email: ${email.subject}`,
           notes: email.snippet,
-      }, { merge: true });
+      });
       toast({ title: 'Logged to CRM', description: 'Email activity has been logged.' });
   };
 
@@ -133,6 +134,9 @@ export default function EmailPage() {
       </AppShell>
     );
   }
+  
+  const sortedEmails = React.useMemo(() => emails ? [...emails].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [], [emails]);
+
 
   return (
     <AppShell>
@@ -156,7 +160,7 @@ export default function EmailPage() {
                 <div className="md:col-span-1 overflow-y-auto border-r">
                     {isLoadingEmails ? <p className="p-4">Loading emails...</p> : (
                         <ul>
-                            {emails && emails.map(email => (
+                            {sortedEmails && sortedEmails.map(email => (
                                 <li key={email.id} className={cn("p-4 border-b cursor-pointer hover:bg-muted", selectedEmail?.id === email.id && "bg-muted")} onClick={() => setSelectedEmail(email)}>
                                     <div className="flex justify-between items-center">
                                         <p className="font-semibold truncate">{email.from}</p>
